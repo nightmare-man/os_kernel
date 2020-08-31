@@ -34,6 +34,7 @@ loader_msg db "2 loader in real.",0
 
 loader_start:
 
+;----------------------------------------loader 开始工作 实模式下
 mov ax,0
 mov es,ax
 
@@ -87,7 +88,7 @@ mov bx,0x001f;设置颜色
 mov dx,0x1800;设置行列
 int 0x10;
 
-;--进入保护模式
+;----------------------------------------进入保护模式
 ;打开A20
 in al,0x92
 or al,0000_0010b
@@ -101,6 +102,8 @@ mov eax,cr0
 or eax,0x01
 mov cr0,eax
 
+
+;----------------------------------------刷新流水线里的指令 刷新各个段寄存器及缓存部分
 jmp dword SELECTOR_CODE:p_mode_start
 
 
@@ -113,6 +116,15 @@ mov es,ax
 mov fs,ax
 mov ax,SELECTOR_VIDEO
 mov gs,ax;gs指向video段
+
+
+
+
+;----------------------------------------读入 kernel.bin
+mov eax,KERNEL_START_SECTOR
+mov esi,KERNEL_BIN_BASE_ADDR
+mov ecx,200
+call rd_disk_32
 
 call setup_page
 sgdt [gdt_ptr];重新写回gdtr的值
@@ -132,12 +144,64 @@ mov cr0,eax;开启分页机制
 
 lgdt [gdt_ptr];开启分页机制后，重新加载gdt
 
-mov byte [gs:320],'V'
-jmp $
+
+call kernel_init
+mov esp,0x9f000
+jmp KERNEL_ENTRY_POINT
 
 
 
-;----创建页目录及页表
+;----------------------------------------以下是调用例程
+;----------------------------------------
+;----------------------------------------加载内核段
+
+kernel_init:
+xor eax,eax
+xor ebx,ebx;ebx用来记载程序头表的偏移地址 program headers table 【elf文件偏移0x20 四字节】
+xor ecx,ecx; cx用来记载头表的数量          【elf文件偏移0x38 两字节】 
+xor edx,edx;dx记载e_phentsize,即头表的大小 【elf文件偏移0x36 两字节】
+
+mov dx,[KERNEL_BIN_VIRTUAL_ADDR + 0x2a]
+mov ebx,[KERNEL_BIN_VIRTUAL_ADDR +0x1c]
+add ebx,KERNEL_BIN_VIRTUAL_ADDR
+mov cx,[KERNEL_BIN_VIRTUAL_ADDR+0x2c]
+
+.each_segment:
+;检测segment的type是不是load，且必须加载的目标地址要是0xc0000000以上的（因为其他虚拟地址暂时未分配！）
+cmp dword [ebx+0],PT_LOAD
+jne .ptnull
+test dword [ebx+8],0x80000000
+jz .ptnull
+test dword [ebx+8],0x40000000
+jz .ptnull
+
+push dword [ebx+20];压入segment大小
+mov eax,[ebx+4];压入segment在文件里的起始偏移地址
+add eax,KERNEL_BIN_VIRTUAL_ADDR;拿到segment在缓冲区的虚拟地址
+push eax;压入要复制的起始地址
+push dword [ebx+8];压入segment想要的的虚拟地址
+call mem_cpy
+add esp,12;跳过三个参数
+.ptnull:
+add ebx,edx
+loop .each_segment
+ret
+;----------------------------------------进行内存复制 （dst，src，size）es edi ds esi ecx，通过push传入 stdcall
+mem_cpy:
+cld;df标志位置0 正向复制
+push ebp
+mov ebp,esp
+
+push ecx                                                 
+mov edi,[ebp+8];   [参数三][参数二][参数一][ret addr][ebp][ecx]
+                                                   ; 个 ebp指向[ebp] ，+8指向 参数一（stdcall，右边参数先push 在栈底）
+mov esi,[ebp+12]
+mov ecx,[ebp+16]
+rep movsb;rep movsb 串复制 每次复制1byte 从 ds si ->es edi 由于是平坦模型 ds es都一样段起始地址都是0x00000000
+pop ecx
+pop ebp
+ret
+;----------------------------------------创建页目录及页表
 
 setup_page:
 mov ecx,4096
@@ -188,4 +252,62 @@ add eax,0x1000
 loop .create_kernel_pde
 ret
 
+rd_disk_32:; 保护模式下的32位读磁盘 eax LBA扇区号 ds:esi 读入内存的地址 ecx 读入的扇区数
+    push ecx
+    push ds
+    push esi
+    push edi
+    mov ebp,eax;//使用32位寄存器
+    mov edi,ecx;//对eax cx备份
 
+    mov dx,0x1f2
+    mov al,cl
+    out dx,al;写入数据
+
+    mov eax,ebp
+
+    mov dx,0x1f3;从 eax写入0-27位地址到对应端口
+    out dx,al
+
+    mov cl,8
+    shr eax,cl
+    mov dx,0x1f4
+    out dx,al
+
+    shr eax,cl
+    mov dx,0x1f5
+    out dx,al
+
+    shr eax,cl
+    and al,0x0f
+    or al,0xe0;将4-7位设置成0xe0 使用lba模式
+    mov dx,0x1f6
+    out dx,al
+
+    mov dx,0x1f7
+    mov al,0x20
+    out dx,al;读命令
+
+.not_ready:;阻塞式读取
+    nop
+    in al,dx;0x1f7既用来写命令 又用来查询命令后的状态
+    and al,0x88
+    cmp al,0x08;如果第3位为1 就准备就绪了 并不需要第7位也为1
+    jnz .not_ready;不是0x88就循环等
+
+    mov eax,edi
+    mov edx,256
+    mul edx
+    mov ecx,eax;//16位*16位 结果 dx：ax ax是低16位 保存着需要读取的次数
+    ;一个扇区512字节 需要读 256次（1次16位）
+    mov dx,0x1f0
+.go_on_read:
+    in ax,dx;这里是x一次读16位，16位的端口而不是8位
+    mov [ds:esi],ax
+    add esi,2
+    loop .go_on_read
+    pop edi
+    pop esi
+    pop ds
+    pop ecx
+    ret
