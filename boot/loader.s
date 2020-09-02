@@ -1,4 +1,4 @@
-%include "boot.inc"
+%include "include/boot.inc"
 LOADER_STACK_TOP equ LOADER_BASE_ADDR
 SECTION loaders vstart=LOADER_BASE_ADDR
 jmp near loader_start
