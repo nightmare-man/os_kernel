@@ -102,6 +102,7 @@ cmp bx,2000
 jl .set_cursor;小于2000设置光标，反之滚屏
 jmp .roll_screen
 ;;;;;
+.is_line_feed:;;\r 和\n 一样的处理都回车再换行 遵循linux的规范
 .is_carriage_return:
 mov si,80
 xor dx,dx
@@ -109,9 +110,6 @@ mov ax,bx
 div si
 mul si
 mov bx,ax
-jmp .set_cursor
-;;;;;
-.is_line_feed:
 add bx,80
 cmp bx,2000
 jnb .roll_screen
