@@ -7,6 +7,28 @@
 ;可以引用 os_kernel/lib/kernel/print.h 包含函数声明和数据定义
 [bits 32]
 section .text
+
+global put_str
+put_str:;传递一个参数 字符串地址（相对于0x00）
+pushad
+mov ebx,[esp+36]
+.put_str_loop:
+xor ecx,ecx
+mov cl,[ebx]
+cmp cl,0
+je .put_str_over
+push ecx;实际是压入4个字节 32位下
+call put_char
+add esp,4;清零参数栈空间
+inc ebx
+jmp .put_str_loop
+
+.put_str_over:
+popad
+ret
+
+
+
 global sleep
 sleep:
 push eax

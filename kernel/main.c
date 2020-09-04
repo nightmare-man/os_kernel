@@ -3,6 +3,8 @@
 //kernel.bin 即内核用dd命令写入硬盘第9扇区
 #include "../lib/kernel/print.h"
 int main(){
+    
+    put_str("this is kernel,3!\r\nhello\r\n");
     int i=0;
     while(1){
         sleep(40);
