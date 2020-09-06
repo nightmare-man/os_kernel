@@ -6,6 +6,9 @@
 ;再和调用者链接再一起
 ;可以引用 os_kernel/lib/kernel/print.h 包含函数声明和数据定义
 [bits 32]
+section .data
+global trans_table
+trans_table db '0123456789ABCDEF',0
 section .text
 
 global put_str
@@ -27,6 +30,34 @@ jmp .put_str_loop
 popad
 ret
 
+global put_int
+put_int:;16进制形式打印一个32位小端字节序的整数
+pushad
+mov ebx,[esp+36]
+mov ecx,4
+.put_int_loop:
+rol ebx,8
+xor eax,eax
+mov al,bl
+mov dl,16
+div dl
+xor edx,edx
+mov dl,ah
+mov dl,[trans_table+edx]
+push edx
+call put_char
+add esp,4
+
+xor edx,edx
+mov dl,al
+mov dl,[trans_table+edx]
+push edx
+call put_char
+add esp,4;至此打印完一个字节
+
+loop .put_int_loop
+popad
+ret
 
 
 global sleep
