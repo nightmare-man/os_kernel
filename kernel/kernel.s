@@ -11,6 +11,8 @@
 ;所以假设都压入中断码 在iret之前 要跳过中断码，所以为了统一，没有中断码我们就自己
 ;压入一个
 extern put_str;声明外部标号（函数）
+extern idt_table;使用idt_table数组 里面有真正handler的地址
+
 
 section .data
 intr_str db "interrupt occur!",0x0a,0
@@ -23,16 +25,31 @@ intr_entry_table:
 section .text
 intr_%1_entry:  ;使用宏参数产生不同的处理程序标号
 %2;由传入参数决定是不是要手动平衡error_code 栈
-push intr_str
-call put_str
-add esp,4;跳过传入参数
+
+pushad
+push ds
+push es
+push fs
+push gs
+
 
 mov al,0x20; 0010 0000  通过第3 4位均为0表示发送的是OCW2（operation command word2） sl为0 eoi为1
 ;表示发送结束当前正在处理的中断的信号
 out 0xa0,al;发送给从片
 out 0x20,al;发送给主片
 
-add esp,4;跳过error_code
+push %1;传入中断号 不管handler用不用
+call [idt_table+ %1 *4];间接跳转到handler入口地址
+add esp,4;跳过传入的参数
+
+pop gs
+pop fs
+pop es
+pop ds
+popad
+
+add esp,4 ;跳过error code
+
 iret
 
 section .data
