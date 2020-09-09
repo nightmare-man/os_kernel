@@ -39,19 +39,17 @@ mov ecx,4
 rol ebx,8
 xor eax,eax
 mov al,bl
-mov dl,16
-div dl
-xor edx,edx
-mov dl,ah
-mov dl,[trans_table+edx]
-push edx
+shr al,4
+mov al,[trans_table+eax]
+push eax
 call put_char
 add esp,4
 
-xor edx,edx
-mov dl,al
-mov dl,[trans_table+edx]
-push edx
+
+mov al,bl
+and al,0x0f
+mov al,[trans_table+eax]
+push eax
 call put_char
 add esp,4;至此打印完一个字节
 
