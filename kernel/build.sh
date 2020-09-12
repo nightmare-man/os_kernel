@@ -1,7 +1,7 @@
 gcc -c -m32 -fno-stack-protector main.c -o ../build/main.o
 gcc -c -m32 -fno-stack-protector init.c -o ../build/init.o
 gcc -c -m32 -fno-stack-protector interrupt.c -o ../build/interrupt.o
-gcc -c -m32 -fno-stack-protector timer.c -o ../build/timer.o
+gcc -c -m32 -fno-stack-protector ../device/timer.c -o ../build/timer.o
 nasm -f elf32 kernel.s -o ../build/kernel.o
 nasm -f elf32 print.s -o ../build/print.o
 ld ../build/main.o ../build/init.o ../build/interrupt.o ../build/kernel.o ../build/print.o ../build/timer.o -melf_i386 -Ttext 0xc0001500 -e main -o ../build/kernel.bin
