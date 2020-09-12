@@ -3,7 +3,7 @@
 //kernel.bin 即内核用dd命令写入硬盘第9扇区
 #include "../lib/kernel/print.h"
 #include "../lib/kernel/init.h"
-
+//#include "../lib/kernel/debug.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -11,13 +11,15 @@
 	至于-e main 只是将elf的entry指向main被分配的线性地址，在此时肯定大于0xc0001500
 	所以这个代码有问题 因为我们的loader.s里将kernel.bin的入口地址写死了 0xc0001500 并不是去读elf的entry
 
-	解决方法有2：1.改loader.s 2.不将任何代码至于main函数前面
+	解决方法有2：
+			1.改loader.s
+			2.不将任何代码至于main函数前面
 */
 
-void test(){
-	put_str("this is test\n");
-	while(1);
-}
+// void test(){
+// 	put_str("this is test\n");
+// 	while(1);
+// }
 
 //在print.s中 trans_table是一个全局的 .data段的的标号，
 //标号实际会被汇编器翻译成一个地址，而地址里的数据 也就是我们在标号后面跟上的db 后的
@@ -29,6 +31,7 @@ int main(){
     put_str("I am kernel\n");
     init_all();
     asm volatile("sti;");
+	intr_disable();
     while(1);
     return 0;
 }

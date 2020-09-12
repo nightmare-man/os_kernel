@@ -12,6 +12,11 @@
 //#include "global.h"
 #define IDT_DESC_CNT 0x21 //目前支持的中断数
 
+#define EFLAGS_IF 0x00000200 //IF位为1
+#define GET_EFLAGS(EFLAG_VAR) asm volatile("pushfl;popl %0":"=g"(EFLAG_VAR))
+//g 表示分配任意寄存器 = 表示可读
+
+
 #define PIC_M_CTRL 0x20 //8259a主片 控制 端口
 #define PIC_M_DATA 0x21 //数据端口
 #define PIC_S_CTRL 0xa0 //从片 控制端口
@@ -121,4 +126,32 @@ void idt_init(){
     uint64_t idt_operand = (sizeof(idt)-1)|(  ((uint64_t)((uint32_t)idt) )<<16  );//sizeof(idt)-1即是idt界限
     asm volatile("lidt %0"::"m"(idt_operand));
     put_str("idt_init done!\n");
+}
+
+enum intr_status intr_get_status(void){
+	uint32_t eflags=0;
+	GET_EFLAGS(eflags);
+	return (eflags & EFLAGS_IF)?INTR_ON:INTR_OFF;
+}
+enum intr_status intr_enable(void){
+	enum intr_status old_status;
+	if(intr_get_status()==INTR_ON){
+		old_status=INTR_ON;
+		return old_status;
+	}else{
+		old_status=INTR_OFF;
+		asm volatile("sti;");//打开中断
+		return old_status;
+	}
+}
+enum intr_status intr_disable(void){
+	enum intr_status old_status;
+	if(intr_get_status()==INTR_ON){
+		old_status=INTR_ON;
+		asm volatile("cli;");//关闭中断
+		return old_status;
+	}else{
+		old_status=INTR_OFF;
+		return old_status;
+	}
 }
