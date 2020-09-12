@@ -1,4 +1,4 @@
-%include "../boot/include/boot.inc"
+%include "./include/boot.inc"
 
 
 ;.text节包含两个函数 符号是global 可以供调用 是静态链接 
