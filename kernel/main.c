@@ -1,6 +1,11 @@
 //被编译为 kernel.bin gcc main.c -c -m32 -o main.o ;
 //ld main.o print.o -melf_i386 -Ttext 0xc0001500 -e main -o kernel.bin
 //kernel.bin 即内核用dd命令写入硬盘第9扇区
+
+
+//我终于知道怎么样链接 才不会出现多余的segment了，即有gcc -c 生成的.o文件
+//和nasm生成的.o文件 链接起来 就不会有多余的segment文件
+
 #include "../lib/kernel/print.h"
 #include "../lib/kernel/init.h"
 #include "../lib/kernel/debug.h"
