@@ -18,7 +18,6 @@ GDT_LIMIT equ  GDT_SIZE-1
 
 times 120 dd 0;预留60个段描述符
 
-total_mem_bytes dd 0;保存容量
 
 SELECTOR_CODE equ (0x0001<<3) + TI_GDT + RPL0
 SELECTOR_DATA equ (0x0002<<3) + TI_GDT + RPL0
@@ -29,7 +28,7 @@ gdt_ptr dw GDT_LIMIT
 
 ards_buf times 240 db 0;缓冲区 保存返回结构
 ards_nr dw 0;统计返回多少个结构
-mem_total_size dd 0;32位 下 最大32位
+
 loader_msg db "2 loader in real.",0
 
 loader_start:
@@ -79,7 +78,7 @@ mov ds,ax
 mov ss,ax
 mov sp,LOADER_BASE_ADDR
 
-mov [mem_total_size],ebx;写入内存大小
+mov [MEM_BYTES_TOTAL_ADDR],ebx;写入内存大小
 
 mov bp,loader_msg;es:bp 待显示字符串
 mov cx,17

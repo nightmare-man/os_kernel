@@ -94,7 +94,7 @@ static void idt_desc_init(void){
     for(i=0;i<IDT_DESC_CNT;i++){
         make_idt_desc(&idt[i],IDT_DESC_ATTR_DPL0,intr_entry_table[i]);
     }
-    put_str("    idt_desc_init done!\n");
+    put_str("idt_desc_init done!\n");
 }
 static void pic_init(void){
 
@@ -114,7 +114,7 @@ static void pic_init(void){
     //只开放主片IR0 （连在时钟上，时钟中断）
     outb(PIC_M_DATA,0xfe);//OCW1 完成ICW初始化后 对0x21/0xa1 的第一个写入即是OCW1 用于屏蔽IR 
     outb(PIC_S_DATA,0Xff);//从片全关
-    put_str("   pic_init done!\n");
+    put_str("pic_init done!\n");
 }
 void idt_init(){
     put_str("idt_init start\n");

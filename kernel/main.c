@@ -35,21 +35,9 @@
 //所以 trans_table对应的变量类型是char而不是char* 我们这里说的类型是这个别名对应的数据
 //的类型，而不是说别名本身是什么
 int main(){
-	char * str="this is a test sentence\n";
-	uint8_t p[4];
-	p[0]=0x6f;
-	p[1]=0xff;
-	p[2]=0xfb;
-	p[3]=0x3f;
-	struct bitmap b1;
-	b1.btmp_bytes_len=4;
-	b1.bits=p;
-	int ret=bitmap_scan(&b1,2);
     put_str("\nI am kernel\n");
     init_all();
    // asm volatile("sti;");
-	put_int(ret);
-	put_char('\n');
     while(1);
     return 0;
 }

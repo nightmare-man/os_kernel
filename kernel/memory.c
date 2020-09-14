@@ -2,7 +2,7 @@
 #include "../lib/kernel/stdint.h"
 #include "../lib/kernel/print.h"
 #include "../lib/kernel/debug.h"
-
+#include "../lib/kernel/global.h"
 #define PG_SIZE 4096
 //页大小
 #define MEM_BITMAP_BASE 0xc009a000 
@@ -19,12 +19,15 @@ struct pool{
 	struct bitmap pool_bitmap;//物理地址 位图
 	uint32_t phy_addr_start;
 	uint32_t pool_size;//位图能管理的物理位图的大小 虚拟地址pool没有这个 因为虚拟地址必定提供4GB全部的位图
-}
+};
 struct pool kernel_pool,user_pool;
 struct virtual_addr kernel_vaddr;//给内核分配虚拟地址 ，也就是针对内核的PDT(内核被单独作为一个任务 有单独的虚拟地址空间，单独的页表)
 
+
+//下面这个函数 对虚拟内存池和物理内存池进行初始化 由于暂时还没有实现堆 编译器不支持 变长数组 所以我们对变长位图的实现方式是
+//指定一块足够大的内存给它当数组，至于指定哪一块 要根据之前的安排
 static void mem_pool_init(uint32_t all_mem){//传入物理内存的实际 大小 loader.s中检测的
-	put_str("\nmem_pool_init start\n");
+	put_str("mem_pool_init start\n");
 	uint32_t page_table_size = PG_SIZE*256;
 	uint32_t used_mem =page_table_size+0x100000;
 	//这里的used_mem是怎么来的？
@@ -53,14 +56,27 @@ static void mem_pool_init(uint32_t all_mem){//传入物理内存的实际 大小
 	kernel_pool.pool_bitmap.bits=(void*)(MEM_BITMAP_BASE);//现阶段没有malloc 直接把已经规划好的位图地址强制转换成void* 拿来当位图
 	user_pool.pool_bitmap.bits=(void*)(MEM_BITMAP_BASE+kbm_length);
 
-	put_str("   kernel_pool_bitmap_start:");
+	put_str("kernel_pool_bitmap_start:");
 	put_int((uint32_t)kernel_pool.pool_bitmap.bits);
-	put_str("   kernel_pool_phy_addr_start:");
+	put_char('\n');
+
+	put_str("kernel_pool_bitmap_len:");
+	put_int((uint32_t)kernel_pool.pool_bitmap.btmp_bytes_len);
+	put_char('\n');
+
+	put_str("kernel_pool_phy_addr_start:");
 	put_int((uint32_t)kernel_pool.phy_addr_start);
-	put_str('\n');
-	put_str("   user_pool_bitmap_start:");
+	put_char('\n');
+
+	put_str("user_pool_bitmap_start:");
 	put_int((uint32_t)user_pool.pool_bitmap.bits);
-	put_str("   user_pool_phy_addr_start:");
+	put_char('\n');
+
+	put_str("user_pool_bitmap_len:");
+	put_int((uint32_t)user_pool.pool_bitmap.btmp_bytes_len);
+	put_char('\n');
+
+	put_str("user_pool_phy_addr_start:");
 	put_int((uint32_t)user_pool.phy_addr_start);
 	put_char('\n');
 
@@ -72,8 +88,17 @@ static void mem_pool_init(uint32_t all_mem){//传入物理内存的实际 大小
 	//这里只考虑--堆--所以给堆的物理大小和虚拟大小一一对应（堆不会被换入换出 虚拟内存和物理内存始终u对应）
 	kernel_vaddr.vaddr_bitmap.bits=((void*)MEM_BITMAP_BASE+kbm_length+ubm_length);
 	//理论上 物理地址支持512MB 位图占16KB 然后后面1KB是PCB 我们无法紧挨着物理地址的位图来当作虚拟内存的位图
-	//但是实际上 我们现在没有传入512MB作为参数 另外 现在还没有使用PCB 用了就用了，而且我们并没有对虚拟内存池
-	//进行初始化
+	//但是实际上 我们现在没有传入512MB作为参数 另外 现在还没有使用PCB  ！！！！暂时放在这里！！！
+	kernel_vaddr.vaddr_start=K_HEAP_START;//虚拟内存池分配的虚拟起始地址
+	bitmap_init(&kernel_vaddr.vaddr_bitmap);
+	put_str("mem_pool_init done\n");
+}
 
+void mem_init(){
+	put_str("mem_init start\n");
+	uint32_t mem_bytes_total =(*(uint32_t*)(MEM_BYTES_TOTAL_ADDR));//之前loader.s里储存在MEM_BYTES_TOTAL处的
+	//检测到的物理内存大小
+	mem_pool_init(mem_bytes_total);
+	put_str("mem_init done\n");
 }
 

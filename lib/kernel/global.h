@@ -1,6 +1,8 @@
 #ifndef _GLOBAL_H
 #define _GLOBAL_H
 #include "./stdint.h"
+#define MEM_BYTES_TOTAL_ADDR 0x1f0
+
 #define RPL0 0
 #define RPL1 1
 #define RPL2 2
