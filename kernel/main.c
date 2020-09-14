@@ -10,6 +10,7 @@
 #include "../lib/kernel/init.h"
 #include "../lib/kernel/debug.h"
 #include "../lib/string.h"
+#include "../lib/kernel/bitmap.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -35,14 +36,20 @@
 //的类型，而不是说别名本身是什么
 int main(){
 	char * str="this is a test sentence\n";
-	
+	uint8_t p[4];
+	p[0]=0x6f;
+	p[1]=0xff;
+	p[2]=0xfb;
+	p[3]=0x3f;
+	struct bitmap b1;
+	b1.btmp_bytes_len=4;
+	b1.bits=p;
+	int ret=bitmap_scan(&b1,2);
     put_str("\nI am kernel\n");
     init_all();
    // asm volatile("sti;");
-    put_str(str);
-	put_str("in above sentence,there are:");
-	put_int(strchrs(str,'i'));
-	put_str("'i'\n");
+	put_int(ret);
+	put_char('\n');
     while(1);
     return 0;
 }
