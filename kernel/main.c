@@ -11,6 +11,7 @@
 #include "../lib/kernel/debug.h"
 #include "../lib/string.h"
 #include "../lib/kernel/bitmap.h"
+#include "../lib/kernel/memory.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -35,9 +36,13 @@
 //所以 trans_table对应的变量类型是char而不是char* 我们这里说的类型是这个别名对应的数据
 //的类型，而不是说别名本身是什么
 int main(){
-    put_str("\nI am kernel\n");
+	put_str("\nI am kernel\n");
     init_all();
-   // asm volatile("sti;");
+   	asm volatile("cli;");
+	void*vaddr=get_kernel_page(3);
+	put_str("\n get_kernel_page start vaddr is ");
+	put_int((uint32_t)vaddr);
+	put_char('\n');
     while(1);
     return 0;
 }
