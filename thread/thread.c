@@ -6,10 +6,10 @@
 
 
 
-static void kernel_thread(thread_func*func,void*arg){
+static void kernel_thread(thread_func func,void*arg){
 	func(arg);
 }
-void thread_create(struct task_struct*pthread,thread_func*func,void*arg){
+void thread_create(struct task_struct*pthread,thread_func func,void*arg){
 	pthread->self_kstack-=sizeof(struct intr_stack);//给intr_stack 留空间  栈顶往下挪就是留出空间
 	pthread->self_kstack-=sizeof(struct thread_stack);//同样 thread_stack
 
@@ -31,7 +31,7 @@ void init_thread(struct task_struct* pthread,char*name,int prio){
 	pthread->stack_magic=0x19980114;//定义的栈边界检测 魔数
 }
 
-struct task_stack* thread_start(char*name,int prio,thread_func*func,void*func_arg){
+struct task_struct* thread_start(char*name,int prio,thread_func func,void*func_arg){
 	struct task_struct* thread=get_kernel_page(1);//分配空间
 	init_thread(thread,name,prio);
 	thread_create(thread,func,func_arg);

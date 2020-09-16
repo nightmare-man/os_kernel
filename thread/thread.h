@@ -1,7 +1,7 @@
 #ifndef _THREAD_H
 #define _THREAD_H
 #include "./stdint.h"
-typedef void thread_func(void*);
+typedef void(*thread_func)(void*);
 //thread_func即是 函数变量类型
 
 //以下定义执行流/线程的几种状态
@@ -53,9 +53,9 @@ struct thread_stack{
 	uint32_t esi;
 	//根据c语言的abi规范 这四个寄存器由被调用者保存
 
-	void(*eip)(thread_func*func,void*func_arg);//
+	void(*eip)(thread_func func,void*func_arg);//
 	void(*unsign_retaddr)(void);//
-	thread_func*function;
+	thread_func function;
 	void*func_arg;
 //这一个栈不是很理解 先写着 后面再来分析 2020-9-16
 };
@@ -69,5 +69,5 @@ struct task_struct{
 	//stack_magic检测 在边界防止破坏PCB除栈以外的信息
 };
 
-struct task_stack* thread_start(char*name,int prio,thread_func*func,void*func_arg);
+struct task_stack* thread_start(char*name,int prio,thread_func func,void*func_arg);
 #endif
