@@ -5,7 +5,6 @@
 #include "../lib/kernel/global.h"
 #include "../lib/string.h"
 #include "../lib/kernel/debug.h"
-#define PG_SIZE 4096
 //页大小
 #define MEM_BITMAP_BASE 0xc009a000 
 //将物理内存池的位图放置在0x9a000处（物理地址）

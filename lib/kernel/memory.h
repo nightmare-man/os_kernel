@@ -2,6 +2,7 @@
 #define __KERNEL_MEMORY_H
 #include "./stdint.h"
 #include "./bitmap.h"
+#define PG_SIZE 4096
 struct virtual_addr{
 	struct bitmap vaddr_bitmap;
 	uint32_t vaddr_start;

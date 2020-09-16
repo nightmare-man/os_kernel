@@ -15,7 +15,8 @@ CFLAGS = -m32 ${CC_LIB} -c -fno-builtin -fno-stack-protector
 #-Wall 显示所有警告 -fno-builtin 关闭内建函数(这样才可以声明标准库里的同名函数 比如exit open等) -fno-stack-protector 关闭栈保护 后面两个w开头的时和函数声明有关
 LDFLAGS = -melf_i386 -Ttext ${ENTRY_POINT} -e main #-Map ${BUILD_DIR}/kernel.map
 OBJS = ${BUILD_DIR}/main.o ${BUILD_DIR}/init.o ${BUILD_DIR}/interrupt.o ${BUILD_DIR}/debug.o \
-	${BUILD_DIR}/print.o ${BUILD_DIR}/kernel.o ${BUILD_DIR}/timer.o ${BUILD_DIR}/string.o ${BUILD_DIR}/bitmap.o ${BUILD_DIR}/memory.o 
+	${BUILD_DIR}/print.o ${BUILD_DIR}/kernel.o ${BUILD_DIR}/timer.o ${BUILD_DIR}/string.o ${BUILD_DIR}/bitmap.o ${BUILD_DIR}/memory.o\
+	${BUILD_DIR}/thread.o 
 
 
 #####以下是编译部分
@@ -41,6 +42,10 @@ ${BUILD_DIR}/bitmap.o:kernel/bitmap.c lib/kernel/print.h lib/kernel/init.h lib/k
 	${CC} ${CFLAGS} $< -o $@
 ${BUILD_DIR}/memory.o:kernel/memory.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
 	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h lib/string.h lib/kernel/bitmap.h lib/kernel/memory.h
+	${CC} ${CFLAGS} $< -o $@
+${BUILD_DIR}/thread.o:thread/thread.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
+	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h lib/string.h lib/kernel/bitmap.h lib/kernel/memory.h\
+	thread/thread.h
 	${CC} ${CFLAGS} $< -o $@
 #####以下是汇编部分
 ${BUILD_DIR}/print.o:kernel/print.s
