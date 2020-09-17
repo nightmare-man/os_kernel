@@ -155,3 +155,7 @@ enum intr_status intr_disable(void){
 		return old_status;
 	}
 }
+//设置新状态 返回老状态
+enum intr_status intr_set_status(enum intr_status status){
+	return status&INTR_ON?intr_enable():intr_disable();
+}
