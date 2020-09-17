@@ -36,18 +36,14 @@
 //都是对某个内存地址的别名，里面的数据都可以通过访问这个地址对应的空间得到
 //所以 trans_table对应的变量类型是char而不是char* 我们这里说的类型是这个别名对应的数据
 //的类型，而不是说别名本身是什么
-void func1(void*);
+
 int main(){
+	
+	
 	put_str("\nI am kernel\n");
     init_all();
-//	k_thread_a=func1;
-    thread_start("func1",31,func1,"ARGA ");
+
     while(1);
     return 0;
 }
-void func1(void*arg){
-	char*p=arg;
-	while(1){
-		put_str(p);
-	}
-}
+

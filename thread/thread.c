@@ -67,10 +67,10 @@ struct task_struct* thread_start(char*name,int prio,thread_func func,void*func_a
 	
 
 	//现在start一个thread的方式不是直接让其被执行 而是让其加入ready链表 
-	ASSERT(!elem_find(thread_ready_list,thread->general_tag));//确保之前不在就绪链表
-	list_append(thread_ready_list,thread->general_tag);
-	ASSERT(!elem_find(thread_all_list,thread->all_list_tag));//确保之前不在所有节点链表
-	list_append(thread_all_list,thread->all_list_tag);
+	ASSERT(!elem_find(&thread_ready_list,&thread->general_tag));//确保之前不在就绪链表
+	list_append(&thread_ready_list,&thread->general_tag);
+	ASSERT(!elem_find(&thread_all_list,&thread->all_list_tag));//确保之前不在所有节点链表
+	list_append(&thread_all_list,&thread->all_list_tag);
 
 	
 	
@@ -91,7 +91,7 @@ static void make_main_thread(void){
 	
 	//main函数已经被执行了 有自己的上下文 不需要我们去初始化它的上下文 所以不用执行 thread_create()
 	
-	ASSERT(!elem_find(thread_all_list,main_thread->all_list_tag));//不能之前就在所有线程节点链表
-	list_append(thread_all_list,main_thread->all_list_tag);//加入到所有线程节点链表
+	ASSERT(!elem_find(&thread_all_list,&main_thread->all_list_tag));//不能之前就在所有线程节点链表
+	list_append(&thread_all_list,&main_thread->all_list_tag);//加入到所有线程节点链表
 	//main线程 处于running状态 不用加入ready链表
 }

@@ -1,5 +1,7 @@
 #ifndef _LIB_KERNEL_LIST_H
 #define _LIB_KERNEL_LIST_H
+#include "./stdint.h"
+#include "./assert.h"
 #define offset(struct_type,member) (int)(&((struct_type*)0)->member);//拿到struct_type这个结构中member成员所在的偏移量
 //将0地址强制转换成struct_type的指针 然后对这个结构中的member进行取地址 再转换成int 即是该成员在该结构中的偏移
 #define elem2entry(struct_type,struct_member_name,elemp_tr) \

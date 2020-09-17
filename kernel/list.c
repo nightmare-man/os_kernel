@@ -29,7 +29,7 @@ void list_push(struct list*ls,struct list_elem*elem){
 }
 //添加元素到链表的最后面（tail的前面）
 void list_append(struct list*ls,struct list_elem*elem){
-	list_insert_before(ls->tail,elem);
+	list_insert_before(&ls->tail,elem);
 }
 
 //从链表中移除元素elem

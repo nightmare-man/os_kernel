@@ -142,6 +142,8 @@ mov bx,ax
 add bx,80
 cmp bx,2000
 jnb .roll_screen
+jmp .set_cursor
+
 ;;;;;;
 .roll_screen:;从第二开始 往前一行复制 一直到最后一行
 mov esi,0xb8000
@@ -185,4 +187,3 @@ jmp .put_char_done
 .put_char_done:
 popad
 ret
-
