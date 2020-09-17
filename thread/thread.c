@@ -88,7 +88,8 @@ static void make_main_thread(void){
 	//我们在loader.s中 进入kernel.bin 执行之前 将mov esp,0x9f000 这就是main_thread task_struct(tcb)的最高地址了
 	main_thread=running_thread();
 	init_thread(main_thread,"main",31);
-	//不需要执行
+	
+	//main函数已经被执行了 有自己的上下文 不需要我们去初始化它的上下文 所以不用执行 thread_create()
 	
 	ASSERT(!elem_find(thread_all_list,main_thread->all_list_tag));//不能之前就在所有线程节点链表
 	list_append(thread_all_list,main_thread->all_list_tag);//加入到所有线程节点链表
