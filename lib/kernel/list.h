@@ -6,6 +6,9 @@
 		((struct_type*)((int)elem_ptr-offset(struct_type,struct_member_name)))
 		//需要用列表组织的struct_type中，包含一个列表节点 成员  这个宏 就是给定该结构 给定该某一个该类型的变量中的某个成员的地址
 		//求出该结构的起始地址 自然是：成员地址-成员偏移
+
+		//为什么这样做呢？而不是把在链表节点中加入数据部分呢？ 原因是 这样做可以最大限度的重用list.h 不用每一中链表都写一份list.h和
+		//list.c （c语言原生不支持泛型）
 //以下是双向链表
 struct list_elem{
 	struct list_elem*prev;
