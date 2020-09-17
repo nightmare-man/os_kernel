@@ -187,3 +187,54 @@ jmp .put_char_done
 .put_char_done:
 popad
 ret
+
+;以下函数设置光标 参数1 光标位置
+;参数一 ret_addr pushad
+global set_cursor
+set_cursor:;
+pushad
+mov ebx,[esp+36]
+mov dx,0x03d4
+mov al,0x0e
+out dx,al
+
+mov dx,0x03d5
+mov al,bh
+out dx,al
+
+mov dx,0x03d4
+mov al,0x0f
+out dx,al
+
+mov dx,0x03d5
+mov al,bl
+out dx,al
+popad
+ret
+
+;以下读光标位置 无参数 返回值 uint32
+global get_cursor
+get_cursor:
+push edx
+push ebx
+mov dx,0x03d4
+mov al,0x0e
+out dx,al
+
+mov dx,0x03d5
+in al,dx
+mov bh,al
+
+mov dx,0x03d4
+mov al,0x0f
+out dx,al
+
+mov dx,0x03d5
+in al,dx
+mov bl,al
+
+xor eax,eax
+mov ax,bx
+pop ebx
+pop edx
+ret

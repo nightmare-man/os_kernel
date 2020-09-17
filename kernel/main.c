@@ -39,10 +39,13 @@
 
 int main(){
 	
-	
+	uint32_t idx=0;
 	put_str("\nI am kernel\n");
     init_all();
-
+	set_cursor(100);
+	put_str("this is a new cursor index\n");
+	idx=get_cursor();
+	put_int(idx);
     while(1);
     return 0;
 }
