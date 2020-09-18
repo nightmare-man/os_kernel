@@ -16,7 +16,7 @@ CFLAGS = -m32 ${CC_LIB} -c -fno-builtin -fno-stack-protector
 LDFLAGS = -melf_i386 -Ttext ${ENTRY_POINT} -e main #-Map ${BUILD_DIR}/kernel.map
 OBJS = ${BUILD_DIR}/main.o ${BUILD_DIR}/init.o ${BUILD_DIR}/interrupt.o ${BUILD_DIR}/debug.o \
 	${BUILD_DIR}/print.o ${BUILD_DIR}/kernel.o ${BUILD_DIR}/timer.o ${BUILD_DIR}/string.o ${BUILD_DIR}/bitmap.o ${BUILD_DIR}/memory.o\
-	${BUILD_DIR}/thread.o ${BUILD_DIR}/list.o 
+	${BUILD_DIR}/thread.o ${BUILD_DIR}/list.o ${BUILD_DIR}/switch.o
 
 
 #####以下是编译部分
@@ -53,6 +53,8 @@ ${BUILD_DIR}/list.o:kernel/list.c lib/kernel/list.h
 ${BUILD_DIR}/print.o:kernel/print.s
 	${AS} ${ASFLAGS} $< -o $@
 ${BUILD_DIR}/kernel.o:kernel/kernel.s
+	${AS} ${ASFLAGS} $< -o $@ 
+${BUILD_DIR}/switch.o:thread/switch.s
 	${AS} ${ASFLAGS} $< -o $@ 
 	#$< 代表第一个依赖文件 $@所有目标文件
 

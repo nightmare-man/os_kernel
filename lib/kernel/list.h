@@ -2,9 +2,9 @@
 #define _LIB_KERNEL_LIST_H
 #include "./stdint.h"
 #include "./assert.h"
-#define offset(struct_type,member) (int)(&((struct_type*)0)->member);//拿到struct_type这个结构中member成员所在的偏移量
+#define offset(struct_type,member) (int)(&((struct_type*)0)->member)//拿到struct_type这个结构中member成员所在的偏移量
 //将0地址强制转换成struct_type的指针 然后对这个结构中的member进行取地址 再转换成int 即是该成员在该结构中的偏移
-#define elem2entry(struct_type,struct_member_name,elemp_tr) \
+#define elem2entry(struct_type,struct_member_name,elem_ptr) \
 		((struct_type*)((int)elem_ptr-offset(struct_type,struct_member_name)))
 		//需要用列表组织的struct_type中，包含一个列表节点 成员  这个宏 就是给定该结构 给定该某一个该类型的变量中的某个成员的地址
 		//求出该结构的起始地址 自然是：成员地址-成员偏移

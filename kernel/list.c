@@ -54,6 +54,7 @@ bool elem_find(struct list*ls,struct list_elem*elem){
 		if(temp==elem){
 			return true;
 		}
+		temp=temp->next;//2020/9/18 bug fixed:must points to next
 	}
 	return false;
 }

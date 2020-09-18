@@ -26,12 +26,13 @@ section .text
 intr_%1_entry:  ;使用宏参数产生不同的处理程序标号
 %2;由传入参数决定是不是要手动平衡error_code 栈
 
-pushad
+
 push ds
 push es
 push fs
 push gs
 
+pushad
 
 mov al,0x20; 0010 0000  通过第3 4位均为0表示发送的是OCW2（operation command word2） sl为0 eoi为1
 ;表示发送结束当前正在处理的中断的信号
@@ -41,12 +42,12 @@ out 0x20,al;发送给主片
 push %1;传入中断号 不管handler用不用
 call [idt_table+ %1 *4];间接跳转到handler入口地址
 add esp,4;跳过传入的参数
-
+popad
 pop gs
 pop fs
 pop es
 pop ds
-popad
+
 
 add esp,4 ;跳过error code
 

@@ -3,9 +3,11 @@
 #include "../lib/kernel/interrupt.h"
 #include "../lib/kernel/timer.h"
 #include "../lib/kernel/memory.h"
+#include "../thread/thread.h"
 void init_all(){
     put_str("  init  all\n");
     idt_init();
 	timer_init();
 	mem_init();
+	thread_init();
 }

@@ -37,13 +37,27 @@
 //都是对某个内存地址的别名，里面的数据都可以通过访问这个地址对应的空间得到
 //所以 trans_table对应的变量类型是char而不是char* 我们这里说的类型是这个别名对应的数据
 //的类型，而不是说别名本身是什么
-
+void func1(void*);
+void func2(void*);
 int main(){
 	
 	put_str("\nI am kernel\n");
     init_all();
-	asm volatile("sti;");
-    while(1);
+	intr_enable();
+	thread_start("thread1",31,func1,"func1 ");
+	thread_start("thread2",8,func2,"func2 ");
+    while(1){
+		put_str("main ");
+	}
     return 0;
 }
-
+void func1(void*str){
+	while(1){
+		put_str(str);
+	}
+}
+void func2(void*str){
+	while(1){
+		put_str(str);
+	}
+}

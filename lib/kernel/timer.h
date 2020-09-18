@@ -10,7 +10,7 @@
 //锁存器 对计数器的读写方式 
 #define PIT_CONTROL_PORT 0x43
 //控制字寄存器
-
+#include "./stdint.h"
 void frequency_set(uint8_t counter_port,uint8_t counter_no,uint8_t rwl,uint8_t counter_mode,uint16_t counter_value);
 
 #endif

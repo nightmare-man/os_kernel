@@ -11,6 +11,7 @@
 #include "../lib/kernel/io.h"
 #include "../thread/thread.h"
 #include "../lib/kernel/timer.h"
+#include "../lib/kernel/debug.h"
 //#include "global.h"
 #define IDT_DESC_CNT 0x21 //目前支持的中断数
 
@@ -25,7 +26,7 @@
 #define PIC_S_DATA 0xa1 //从片数据端口
 
 uint32_t ticks;// 系统启动以来的总ticks
-void schedule(void);//暂时写在这儿 防止报错
+
 
 //以下是中断门描述符格式 共8字节
 struct gate_desc{
@@ -85,7 +86,10 @@ static void intr_timer_handler(void){
 	cur_thread->elapsed_ticks++;
 	if(cur_thread->ticks==0){
 		//时间片用完 调度新的
+		//处理器进入中断 push eflags cs ip 并if tf =0关闭中断了
+		//所以能保证调度器是原子操作
 		schedule();//schedule 是调度函数
+
 	}else{
 		cur_thread->ticks--;
 		//不然的话thread ticks减1

@@ -6,6 +6,7 @@
 #include "../lib/kernel/interrupt.h"
 #include "../lib/kernel/debug.h"
 #include "../lib/kernel/list.h"
+#include "../lib/kernel/print.h"
 struct task_struct*main_thread;//主线程tcb thread control block
 struct list thread_ready_list;//就绪队列
 struct list thread_all_list;//全部线程队列
@@ -91,8 +92,8 @@ static void make_main_thread(void){
 	main_thread=running_thread();
 	init_thread(main_thread,"main",31);
 	
-	//main函数已经被执行了 有自己的上下文 不需要我们去初始化它的上下文 所以不用执行 thread_create()
-	
+	//main函数已经被执行了 
+	//不需要我们去手动设置它的栈空间来ret到main执行它	
 	ASSERT(!elem_find(&thread_all_list,&main_thread->all_list_tag));//不能之前就在所有线程节点链表
 	list_append(&thread_all_list,&main_thread->all_list_tag);//加入到所有线程节点链表
 	//main线程 处于running状态 不用加入ready链表
@@ -101,6 +102,7 @@ static void make_main_thread(void){
 //以下为调度函数
 void schedule(){
 	ASSERT(intr_get_status()==INTR_OFF);//调度时必须关中断
+	//目前schedule只在时钟中断中被调用 因此不会再被中断 可以保证
 	struct task_struct*cur=running_thread();
 	if(cur->status==TASK_RUNNING){
 		//表示是由于时间片用完了 换下 直接放到ready队列末尾
@@ -119,4 +121,11 @@ void schedule(){
 	next->status=TASK_RUNNING;
 	switch_to(cur,next);//调用切换函数 这个函数用汇编写的
 
+}
+void thread_init(void){
+	put_str("thread_init start\n");
+	list_init(&thread_all_list);//对两个链表进行初始化
+	list_init(&thread_ready_list);
+	make_main_thread();//给主线程 初始化tcb和加入队列
+	put_str("thread_init done\n");
 }

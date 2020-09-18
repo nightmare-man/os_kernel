@@ -25,7 +25,8 @@ enum task_status{
 
 //此栈是中断栈 用于发生中断时保存线程的上下文
 struct intr_stack{
-	//根据栈的用法 总是从高向低扩展 因此 以下结构顺序对应 各数据压入顺序 从下往上
+	//此结构中的成员偏移位置与中断发生时各数据入栈的顺序相同
+	//先入栈的在高地址 详情可见kernel/kernel.s 
 	uint32_t vec_no;//压入的中断号
 	uint32_t edi;
 	uint32_t esi;
@@ -68,7 +69,7 @@ struct thread_stack{
 //这一个栈不是很理解 先写着 后面再来分析 2020-9-16
 };
 struct task_struct{
-	uint32_t*self_kstack;//线程的栈的栈顶，初始状态指向PCB最高地址
+	uint32_t*self_kstack;//用于保存调度中的栈顶，通过这个栈顶的保存恢复来切换栈
 	enum task_status status;
 	uint8_t priority;
 	char name[16];
@@ -87,4 +88,6 @@ struct task_struct{
 
 struct task_struct* thread_start(char*name,int prio,thread_func func,void*func_arg);
 struct task_struct* running_thread();
+void thread_init(void);
+void schedule();
 #endif
