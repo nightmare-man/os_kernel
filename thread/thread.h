@@ -86,4 +86,5 @@ struct task_struct{
 };
 
 struct task_struct* thread_start(char*name,int prio,thread_func func,void*func_arg);
+struct task_struct* running_thread();
 #endif

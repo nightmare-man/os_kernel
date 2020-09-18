@@ -84,6 +84,8 @@ struct task_struct* thread_start(char*name,int prio,thread_func func,void*func_a
 	//正确的执行函数 函数回去调用我们传入的函数及参数！
 	return thread;
 }
+
+//以下函数为 为主线程构造tcb并添加到队列
 static void make_main_thread(void){
 	//我们在loader.s中 进入kernel.bin 执行之前 将mov esp,0x9f000 这就是main_thread task_struct(tcb)的最高地址了
 	main_thread=running_thread();
@@ -94,4 +96,27 @@ static void make_main_thread(void){
 	ASSERT(!elem_find(&thread_all_list,&main_thread->all_list_tag));//不能之前就在所有线程节点链表
 	list_append(&thread_all_list,&main_thread->all_list_tag);//加入到所有线程节点链表
 	//main线程 处于running状态 不用加入ready链表
+}
+
+//以下为调度函数
+void schedule(){
+	ASSERT(intr_get_status()==INTR_OFF);//调度时必须关中断
+	struct task_struct*cur=running_thread();
+	if(cur->status==TASK_RUNNING){
+		//表示是由于时间片用完了 换下 直接放到ready队列末尾
+		ASSERT(!elem_find(&thread_ready_list,&cur->general_tag));//确保之前不在就绪队列
+		list_append(&thread_ready_list,&cur->general_tag);
+		cur->ticks=cur->priority;//重新填充时间片（下次执行的）
+		cur->status=TASK_READY;
+
+	}else{
+		//由于blocked等因素被换下 暂时不考虑
+	}
+	ASSERT(!list_empty(&thread_ready_list));//就绪链表不空 不然没法执行了
+	thread_tag=NULL;//临时变量
+	thread_tag=list_pop(&thread_ready_list);
+	struct task_struct* next=elem2entry(struct task_struct,general_tag,thread_tag);//通过宏（偏移地址计算）得出下一个tcb的位置
+	next->status=TASK_RUNNING;
+	switch_to(cur,next);//调用切换函数 这个函数用汇编写的
+
 }

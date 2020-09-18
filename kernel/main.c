@@ -13,6 +13,7 @@
 #include "../lib/kernel/bitmap.h"
 #include "../lib/kernel/memory.h"
 #include "../thread/thread.h"
+#include "../lib/kernel/interrupt.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -39,13 +40,9 @@
 
 int main(){
 	
-	uint32_t idx=0;
 	put_str("\nI am kernel\n");
     init_all();
-	set_cursor(100);
-	put_str("this is a new cursor index\n");
-	idx=get_cursor();
-	put_int(idx);
+	asm volatile("sti;");
     while(1);
     return 0;
 }
