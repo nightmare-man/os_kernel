@@ -129,3 +129,26 @@ void thread_init(void){
 	make_main_thread();//给主线程 初始化tcb和加入队列
 	put_str("thread_init done\n");
 }
+
+//以下为线程阻塞函数，只能阻塞自己
+void thread_block(enum task_status stat){
+	ASSERT((stat==TASK_BLOCKED)||(stat==TASK_WAITING)||(stat==TASK_HANGING));
+	enum intr_status old_status=intr_disable();//关闭中断 原子操作
+	struct task_struct* cur=running_thread();
+	cur->status=stat;
+	schedule();//线程阻塞自己 调度新线程 由于自己的状态被设置为上述三种之一 因此
+	//在schedule中不会将其加入ready链表中 只能等待其他线程来唤醒
+	//唤醒后回到这里 关闭中断 出thread_block()函数
+	intr_set_status(old_status);
+}
+
+//以下函数解除阻塞线程tar ，
+void thread_unblock(struct task_struct*tar){
+	enum intr_status old_status=intr_disable();
+	ASSERT((tar->status==TASK_BLOCKED)||(tar->status==TASK_HANGING)||(tar->status==TASK_WAITING));
+	ASSERT(!elem_find(&thread_ready_list,&tar->general_tag));
+	//既要是处于阻塞状态 又不在ready链表出现（不然就不用调用该函数了）
+	list_push(&thread_ready_list,&tar->general_tag);//用的push会放在ready链表最前面 尽快得到调度
+	tar->status=TASK_READY;
+	intr_set_status(old_status);
+}
