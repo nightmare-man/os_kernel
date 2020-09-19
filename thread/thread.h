@@ -90,4 +90,6 @@ struct task_struct* thread_start(char*name,int prio,thread_func func,void*func_a
 struct task_struct* running_thread();
 void thread_init(void);
 void schedule();
+void thread_block(enum task_status stat);
+void thread_unblock(struct task_struct*tar);
 #endif
