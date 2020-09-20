@@ -6,7 +6,7 @@
 //我终于知道怎么样链接 才不会出现多余的segment了，即有gcc -c 生成的.o文件
 //和nasm生成的.o文件 链接起来 就不会有多余的segment文件
 
-#include "../lib/kernel/print.h"
+#include "../device/console.h"
 #include "../lib/kernel/init.h"
 #include "../lib/kernel/debug.h"
 #include "../lib/string.h"
@@ -40,24 +40,22 @@
 void func1(void*);
 void func2(void*);
 int main(){
-	
-	put_str("\nI am kernel\n");
-    init_all();
+	init_all();
 	intr_enable();
 	thread_start("thread1",31,func1,"func1 ");
 	thread_start("thread2",8,func2,"func2 ");
     while(1){
-		put_str("main ");
+		console_put_str("main ");
 	}
     return 0;
 }
 void func1(void*str){
 	while(1){
-		put_str(str);
+		console_put_str("func1 ");
 	}
 }
 void func2(void*str){
 	while(1){
-		put_str(str);
+		console_put_str("func2 ");
 	}
 }
