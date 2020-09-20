@@ -14,6 +14,7 @@
 #include "../lib/kernel/memory.h"
 #include "../thread/thread.h"
 #include "../lib/kernel/interrupt.h"
+#include "../lib/kernel/print.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -40,12 +41,13 @@
 void func1(void*);
 void func2(void*);
 int main(){
+	put_str("\nthis is kernel\n");
 	init_all();
 	intr_enable();
-	thread_start("thread1",31,func1,"func1 ");
-	thread_start("thread2",8,func2,"func2 ");
+//	thread_start("thread1",31,func1,"func1 ");
+//	thread_start("thread2",8,func2,"func2 ");
     while(1){
-		console_put_str("main ");
+		
 	}
     return 0;
 }

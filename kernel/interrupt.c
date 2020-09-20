@@ -13,8 +13,8 @@
 #include "../lib/kernel/timer.h"
 #include "../lib/kernel/debug.h"
 //#include "global.h"
-#define IDT_DESC_CNT 0x21 //目前支持的中断数
-
+#define IDT_DESC_CNT 0x22 //目前支持的中断数
+//2020-9-20 加入idt中键盘中断
 #define EFLAGS_IF 0x00000200 //IF位为1
 #define GET_EFLAGS(EFLAG_VAR) asm volatile("pushfl;popl %0":"=g"(EFLAG_VAR))
 //g 表示分配任意寄存器 = 表示可读
@@ -182,7 +182,7 @@ static void pic_init(void){
     outb(PIC_S_DATA,0x01);
 
     //只开放主片IR0 （连在时钟上，时钟中断）
-    outb(PIC_M_DATA,0xfe);//OCW1 完成ICW初始化后 对0x21/0xa1 的第一个写入即是OCW1 用于屏蔽IR 
+    outb(PIC_M_DATA,0xfd);//OCW1 完成ICW初始化后 对0x21/0xa1 的第一个写入即是OCW1 用于屏蔽IR //2020-9-20测试键盘时屏蔽除IR1以外所有引脚中断
     outb(PIC_S_DATA,0Xff);//从片全关
     put_str("pic_init done!\n");
 }
@@ -194,6 +194,7 @@ void idt_init(){
 
     pic_init();//初始化8259a
     uint64_t idt_operand = (sizeof(idt)-1)|(  ((uint64_t)((uint32_t)idt) )<<16  );//sizeof(idt)-1即是idt界限
+	//idt是描述符表
     asm volatile("lidt %0"::"m"(idt_operand));
     put_str("idt_init done!\n");
 }
