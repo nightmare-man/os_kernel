@@ -1,4 +1,4 @@
-#ifndef _HTREAD_SYNC_H
+#ifndef _THREAD_SYNC_H
 #define _THREAD_SYNC_H
 #include "../lib/kernel/list.h"
 #include "../lib/kernel/debug.h"

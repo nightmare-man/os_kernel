@@ -3,6 +3,7 @@
 #include "../lib/kernel/print.h"
 #include "../lib/kernel/io.h"
 #include "./keyboard.h"
+#include "./ioqueue.h"
 
 //以下这一部分 书中将其定义在keyboard.c文件中，并设置为static 可能是既不想被其他文件访问
 //又不想keyboard.h被修改导致keyboard.c变化 我想放在.h文件里 经过思考还是算了 其他文件
@@ -38,6 +39,7 @@
 #define ctrl_r_make 0xe01d
 #define ctrl_r_break 0xe09d
 #define caps_lock_make 0x3a
+
 
 //以下用来记录操作控制字符的状态
 static bool ctrl_status,shift_status,alt_status,caps_lock_status,ext_scancode;
@@ -105,7 +107,7 @@ static char keymap[][2]={
 	{caps_lock_char,caps_lock_char}
 	//其余按键暂时不处理
 };
-
+struct ioqueue kbd_buf;
 static void intr_keyboard_handler(void){
 	bool ctrl_status_last=ctrl_status;
 	bool shift_status_last=shift_status;
@@ -160,7 +162,11 @@ static void intr_keyboard_handler(void){
 		uint8_t index=(scancode&0x00ff);//拿到低8位（因为扩展按键 都是一样的作用一样的低8位 比如右shift的低8位和 一个字节的左shift一样）
 		char cur_char=keymap[index][shift];
 		if(cur_char){
-			put_char(cur_char);
+			if(!ioq_full(&kbd_buf)){
+				//put_char(cur_char);
+				ioq_putchar(&kbd_buf,cur_char);
+			}
+			
 			return ;
 		}
 		//能到这里说明对应的ascii 为0 可能是设置 操作控制字符
@@ -182,6 +188,7 @@ static void intr_keyboard_handler(void){
 }
 void keyboard_init(void){
 	put_str("keyboard_init start");
+	ioqueue_init(&kbd_buf);
 	register_handler(0x21,intr_keyboard_handler);
 	put_str("keyboard_init done\n");
 }

@@ -15,6 +15,8 @@
 #include "../thread/thread.h"
 #include "../lib/kernel/interrupt.h"
 #include "../lib/kernel/print.h"
+#include "../device/ioqueue.h"
+#include "../device/keyboard.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -44,20 +46,40 @@ int main(){
 	put_str("\nthis is kernel\n");
 	init_all();
 	intr_enable();
-//	thread_start("thread1",31,func1,"func1 ");
-//	thread_start("thread2",8,func2,"func2 ");
+	thread_start("thread1",31,func1,"func1_consume:");
+	thread_start("thread2",31,func2,"func2_consume:");
     while(1){
 		
 	}
     return 0;
 }
+//！！！本章点名批评作者写的这两个函数！！！
+//按照作者自己在书里指导的原话 “原子操作的代码应该越小越好...应该尽可能靠近临界区...
+//如果一个线程在开始时就关闭中断，结束前再打开，那么多线程代码会退化成单线程代码”
+//对于这些话 我很是认同，然而本章给出的生产者消费者演示代码，也就是下面两个函数
+//不正是几乎全程关闭中断吗？听其言观其行，这两个函数不够优雅
+//代码不够优雅的主要原因，还是ioq_getchar()这个函数（以及ioq_putchar()）
+//他们在内部只使用一把锁，用来锁定缓冲区空/满 时等待的消费者/生成者的归属权
+//而对于非空/非满时缓冲区的访问，粗暴的要求这两个函数执行时要关闭中断，以此保证
+//缓冲区的原子操作，这就导致无论何处调用 这两个函数 都离不开中断的操作。
+//能够做的更好 就是两个函数各再加一把锁，锁定缓冲区 
 void func1(void*str){
 	while(1){
-		console_put_str("func1 ");
+		enum intr_status old_status=intr_disable();
+		char byte=ioq_getchar(&kbd_buf);
+		console_put_str(str);
+		console_put_char(byte);
+		console_put_char(' ');
+		intr_set_status(old_status);
 	}
 }
 void func2(void*str){
 	while(1){
-		console_put_str("func2 ");
+		enum intr_status old_status=intr_disable();
+		char byte=ioq_getchar(&kbd_buf);
+		console_put_str(str);
+		console_put_char(byte);
+		console_put_char(' ');
+		intr_set_status(old_status);
 	}
 }

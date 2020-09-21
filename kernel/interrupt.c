@@ -182,7 +182,7 @@ static void pic_init(void){
     outb(PIC_S_DATA,0x01);
 
     //只开放主片IR0 （连在时钟上，时钟中断）
-    outb(PIC_M_DATA,0xfd);//OCW1 完成ICW初始化后 对0x21/0xa1 的第一个写入即是OCW1 用于屏蔽IR //2020-9-20测试键盘时屏蔽除IR1以外所有引脚中断
+    outb(PIC_M_DATA,0xfc);//OCW1 完成ICW初始化后 对0x21/0xa1 的第一个写入即是OCW1 用于屏蔽IR 
     outb(PIC_S_DATA,0Xff);//从片全关
     put_str("pic_init done!\n");
 }
