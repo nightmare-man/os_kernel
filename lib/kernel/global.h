@@ -2,7 +2,7 @@
 #define _GLOBAL_H
 #include "./stdint.h"
 #define MEM_BYTES_TOTAL_ADDR 0x1f0
-
+#define GDT_LINE_ADDR 0xc0000903 //这个地址是之前loader.s里我们把描述符都随便保存到了一个位置 那个位置的标号地址是0x903
 //以下是选择子
 #define RPL0 0
 #define RPL1 1
@@ -61,7 +61,7 @@
 
 //GDT descriptor的高32位的第16-23位
 #define GDT_ATTR_HIGH \
-	((DESC_G_4K<<7)+(DESC_D_32<<6)+(DSEC_L<<5)+(DESC_AVL)<<4)
+	((DESC_G_4K<<7)+(DESC_D_32<<6)+(DESC_L<<5)+(DESC_AVL)<<4)
 // 8-15位
 #define GDT_CODE_ATTR_LOW_DPL3 \
 	((DESC_P<<7)+(DESC_DPL_3<<5)+(DESC_S_CODE<<4)+(DESC_TYPE_CODE))
@@ -72,6 +72,7 @@
 #define TSS_DESC_D 0
 #define TSS_ATTR_HIGH \
 	((DESC_G_4K<<7)+(TSS_DESC_D<<6)+(DESC_L<<5)+(DESC_AVL<<4)+0x00)
+//TSS ATTR HIGH 里低四字节是 tss desc limit 的最高4字节 由于tss大小比较小 所以直接写死 0x00
 #define TSS_ATTR_LOW \
 	((DESC_P<<7)+(DESC_DPL_0<<5)+(DESC_S_SYS<<4)+DESC_TYPE_TSS)
 #define SELECTOR_TSS ((4<<3)+(TI_GDT<<2)+RPL0)
@@ -83,6 +84,6 @@ struct gdt_desc{
 	uint8_t attr_low_byte;
 	uint8_t limit_high_attr_high;
 	uint8_t base_high_byte;
-}
+};
 
 #endif

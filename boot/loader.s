@@ -146,7 +146,7 @@ lgdt [gdt_ptr];开启分页机制后，重新加载gdt
 
 call kernel_init
 ;mov esp 0x9f000这是main_thread tcb的最高地址 表明了 在执行main线程
-mov esp,0x9f000
+mov esp,0xc009f000
 jmp KERNEL_ENTRY_POINT
 
 
