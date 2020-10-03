@@ -63,6 +63,9 @@ void init_thread(struct task_struct* pthread,char*name,int prio){
 //以下函数创建一个线程 并将该线程加入到ready链表 all链表 （1 初始tcb 2初始化tcb->thread_task上下文 3加入链表）
 struct task_struct* thread_start(char*name,int prio,thread_func func,void*func_arg){
 	struct task_struct* thread=get_kernel_page(1);//分配空间
+	put_str("tcb:");
+	put_int((uint32_t)thread);
+	put_char('\n');
 	init_thread(thread,name,prio);
 	thread_create(thread,func,func_arg);
 	

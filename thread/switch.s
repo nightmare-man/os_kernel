@@ -22,6 +22,8 @@ global switch_to
 ;中断函数里，然后继续把中断走完 回到线程B被中断之前
 
 ;参数二 参数一 retaddr esi edi ebx ebp
+;参数一是cur tcb首地址，对应该tcb的self_kstack，用于保存cur 的esp
+;参数二是next tcb首地址，
 switch_to:
 push esi
 push edi

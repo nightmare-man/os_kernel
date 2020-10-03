@@ -66,7 +66,12 @@ struct thread_stack{
 	void(*unsign_retaddr)(void);//
 	thread_func function;
 	void*func_arg;
-//这一个栈不是很理解 先写着 后面再来分析 2020-9-16
+//这个栈（内存片）用来初始化线程，通过将新线程B的栈顶初始化到这个结构的起始地址 并设置各个成员
+//然后通过在switch函数中（switch被schedule调用 schedule被时钟中断处理函数调用）将栈顶切换
+//到新线程B的这个结构（原线程的栈顶和返回地址会被保存），执行ret到thread_func。
+//线程B以后再被换下时 会先用自己的栈进入中断 中断进入schedule 再压入tcb指针 next cur
+//通过这两个参数可以访问旧线程和新线程的栈顶，此时线程B的栈顶 不再一定是这个结构thread_stack的起始地址,压入的返回地址
+//也只是schedule中switch调用结束下一条语句的地址
 };
 struct task_struct{
 	uint32_t*self_kstack;//用于保存调度中的栈顶，通过这个栈顶的保存恢复来切换栈
