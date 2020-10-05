@@ -42,21 +42,22 @@ out 0x20,al;发送给主片
 push %1;传入中断号 不管handler用不用
 call [idt_table+ %1 *4];间接跳转到handler入口地址
 add esp,4;跳过传入的参数
-popad
-pop gs
-pop fs
-pop es
-pop ds
-
-
-add esp,4 ;跳过error code
-
-iret
+jmp intr_exit
 
 section .data
 dd intr_%1_entry ;将处理程序有效地址写到.data节
 
 %endmacro
+section .text
+global intr_exit
+intr_exit:
+popad
+pop gs
+pop fs
+pop es
+pop ds
+add esp,4 ;跳过error code
+iret
 
 ;;;;利用宏产生处理程序
 VECTOR 0x00,ZERO   ;使用宏 参数之间用,隔开 使用ZEOR还是ERROR_CODE取决于该cpu处理该中断号时

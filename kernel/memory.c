@@ -129,7 +129,7 @@ static void* vaddr_get(enum pool_flags pf,uint32_t pg_cnt){
 			cnt++;
 		}
 		vaddr_start=cur->userprog_vaddr.vaddr_start+bit_idx_start*PG_SIZE;
-		ASSERT( (uint32_t)vaddr_start<(0xc0000000-PG_SIZE));//分配的块的起始地址上限是0xc0000000-pgsize
+		ASSERT( (uint32_t)vaddr_start<=(0xc0000000-PG_SIZE));//分配的块的起始地址上限是0xc0000000-pgsize
 		//用户虚拟内存池暂时未创建 以后再处理
 	}
 	return ((void*)vaddr_start);//强制类型转换

@@ -1,6 +1,7 @@
 #ifndef _GLOBAL_H
 #define _GLOBAL_H
 #include "./stdint.h"
+#include "./memory.h"
 #define MEM_BYTES_TOTAL_ADDR 0x1f0
 #define GDT_LINE_ADDR 0xc0000903 //这个地址是之前loader.s里我们把描述符都随便保存到了一个位置 那个位置的标号地址是0x903
 //以下是选择子
@@ -76,6 +77,15 @@
 	((DESC_P<<7)+(DESC_DPL_0<<5)+(DESC_S_SYS<<4)+DESC_TYPE_TSS)
 #define SELECTOR_TSS ((4<<3)+(TI_GDT<<2)+RPL0)
 
+
+//以下是eflags信息
+#define EFLAGS_MBS (1<<1) //eflags此位必为1
+#define EFLAGS_IF_1 (1<<9)
+#define EFLAGS_IF_0 (0<<9)
+#define EFLAGS_IOPL_3 (3<<12) //允许特权级3访问端口
+#define EFLAGS_IOPL_0 (0<<12)
+
+
 struct gdt_desc{
 	uint16_t limit_low_word;
 	uint16_t base_low_word;
@@ -84,5 +94,6 @@ struct gdt_desc{
 	uint8_t limit_high_attr_high;
 	uint8_t base_high_byte;
 };
+
 
 #endif
