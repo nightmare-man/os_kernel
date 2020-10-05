@@ -23,4 +23,6 @@ enum pool_flags{
 #define PG_US_U 4 //任意特权级可访问
 void mem_init(void);
 void* get_kernel_page(uint32_t pg_cnt);//此函数从内核内存池分配内存
+void* get_a_page(enum pool_flags pf,uint32_t vaddr);
+uint32_t addr_v2p(uint32_t vaddr);
 #endif

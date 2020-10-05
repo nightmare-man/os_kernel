@@ -46,8 +46,9 @@ int main(){
 	put_str("\nthis is kernel\n");
 	init_all();
 	intr_enable();
-	thread_start("thread1",31,func1,"func1_consume:");
-	thread_start("thread2",31,func2,"func2_consume:");
+	get_a_page(PF_KERNEL,(uint32_t)0xcccc0000);
+	//thread_start("thread1",31,func1,"func1_consume:");
+	//thread_start("thread2",31,func2,"func2_consume:");
     while(1){
 		
 	}

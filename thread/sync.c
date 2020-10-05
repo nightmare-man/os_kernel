@@ -45,7 +45,7 @@ void sema_up(struct semaphore*psema){
 void lock_acquire(struct lock*plock){
 	if(plock->owner!=running_thread()){
 		//当前线程不是锁的持有者时
-		sema_down(&plock->semaphore);//P操作 如果锁已经被别人持有了 会阻塞 知道别人释放锁
+		sema_down(&plock->semaphore);//P操作 如果锁已经被别人持有了 会阻塞 直到别人释放锁
 		plock->owner=running_thread();//执行完P操作 那就表示拿到锁了 
 		ASSERT(plock->holder_repeat_nr==0);
 		plock->holder_repeat_nr++;

@@ -38,6 +38,7 @@ struct tss{
 static struct tss tss;
 
 //更新tss中的esp0 为线程的 tcb顶
+//更新tss栈顶即是切换进程 因为timer中断会把任何进程/线程带到其内核态（0特权级）使用esp0来切换上下文
 void update_tss_esp(struct task_struct* pthread){
 	tss.esp0=(uint32_t*)( (uint32_t)pthread+PG_SIZE);
 }
@@ -49,7 +50,7 @@ static struct gdt_desc make_gdt_desc(uint32_t*desc_addr,uint32_t limit,uint8_t a
 	ret.base_mid_byte=(uint8_t)((desc_base&0x00ff0000)>>16);
 	ret.base_high_byte=(uint8_t)((desc_base&0xff000000)>>24);
 	ret.limit_low_word=(uint16_t)(limit&0x0000ffff);
-	ret.limit_high_attr_high=(uint8_t)((limit&0x000f0000)>>16+attr_high&0xf0);
+	ret.limit_high_attr_high=(uint8_t)((limit&0x000f0000)>>16|(attr_high&0xf0));//有bug这儿
 	ret.attr_low_byte=(uint8_t)attr_low;
 	return ret;
 }
