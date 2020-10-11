@@ -1,4 +1,4 @@
-%include "./include/boot.inc"
+%include "../boot/include/boot.inc"
 
 
 ;.text节包含两个函数 符号是global 可以供调用 是静态链接 
@@ -146,15 +146,15 @@ jmp .set_cursor
 
 ;;;;;;
 .roll_screen:;从第二开始 往前一行复制 一直到最后一行
-mov esi,0xb8000
+mov esi,0xb8000|0xc0000000
 add esi,160;从第二行开始复制
-mov edi,0xb8000
+mov edi,0xb8000|0xc0000000
 add edi,0;往第一行复制
 cld
 mov ecx,1920
 rep movsw;1920个字节
 mov ecx,80
-mov esi,0xb8000
+mov esi,0xb8000|0xc0000000
 add esi,3840;最后一行开头
 .cls:;清除最后一行
 mov byte [esi],0x20

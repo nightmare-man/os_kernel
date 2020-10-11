@@ -7,6 +7,7 @@
 #include "../lib/kernel/debug.h"
 #include "../lib/kernel/list.h"
 #include "../lib/kernel/print.h"
+#include "../lib/user/process.h"
 struct task_struct*main_thread;//主线程tcb thread control block
 struct list thread_ready_list;//就绪队列
 struct list thread_all_list;//全部线程队列
@@ -55,6 +56,7 @@ void init_thread(struct task_struct* pthread,char*name,int prio){
 	pthread->elapsed_ticks=0;//总执行时间初始为0
 	pthread->pgdir=NULL;//线程没有页表
 	pthread->priority=prio;
+	pthread->ticks=prio;
 	pthread->self_kstack=(uint32_t*)((uint32_t)pthread+PG_SIZE);//self_kstack 是线程自己使用的栈的栈顶，初始状态应该是PCB（process 
 	//control block）的最高处,所以是分配的地址（最低处）+页大小
 	pthread->stack_magic=0x19980114;//定义的栈边界检测 魔数
@@ -63,9 +65,6 @@ void init_thread(struct task_struct* pthread,char*name,int prio){
 //以下函数创建一个线程 并将该线程加入到ready链表 all链表 （1 初始tcb 2初始化tcb->thread_task上下文 3加入链表）
 struct task_struct* thread_start(char*name,int prio,thread_func func,void*func_arg){
 	struct task_struct* thread=get_kernel_page(1);//分配空间
-	put_str("tcb:");
-	put_int((uint32_t)thread);
-	put_char('\n');
 	init_thread(thread,name,prio);
 	thread_create(thread,func,func_arg);
 	
@@ -104,31 +103,42 @@ static void make_main_thread(void){
 
 //以下为调度函数
 void schedule(){
+	
 	ASSERT(intr_get_status()==INTR_OFF);//调度时必须关中断
 	//目前schedule只在时钟中断中被调用 因此不会再被中断 可以保证
 	struct task_struct*cur=running_thread();
+	put_int((uint32_t)cur);
+	put_str("will be replace,it status is");
 	if(cur->status==TASK_RUNNING){
 		//表示是由于时间片用完了 换下 直接放到ready队列末尾
 		ASSERT(!elem_find(&thread_ready_list,&cur->general_tag));//确保之前不在就绪队列
 		list_append(&thread_ready_list,&cur->general_tag);
 		cur->ticks=cur->priority;//重新填充时间片（下次执行的）
 		cur->status=TASK_READY;
-
+		put_str(" [RUNNING] ");
 	}else{
 		//由于blocked等因素被换下 暂时不考虑
+		put_str(" [BLOCKED] ");
+		//while(1);
 	}
 	ASSERT(!list_empty(&thread_ready_list));//就绪链表不空 不然没法执行了
 	thread_tag=NULL;//临时变量
 	thread_tag=list_pop(&thread_ready_list);
 	struct task_struct* next=elem2entry(struct task_struct,general_tag,thread_tag);//通过宏（偏移地址计算）得出下一个tcb的位置
 	next->status=TASK_RUNNING;
+	process_active(next);
+	put_str("next is:");
+	put_int((uint32_t)next);
+	put_char('\n');
 	switch_to(cur,next);//调用切换函数 这个函数用汇编写的
 
 }
 void thread_init(void){
+	
 	put_str("thread_init start\n");
 	list_init(&thread_all_list);//对两个链表进行初始化
 	list_init(&thread_ready_list);
+	ASSERT(list_empty(&thread_ready_list)==true);
 	make_main_thread();//给主线程 初始化tcb和加入队列
 	put_str("thread_init done\n");
 }
@@ -139,6 +149,7 @@ void thread_block(enum task_status stat){
 	enum intr_status old_status=intr_disable();//关闭中断 原子操作
 	struct task_struct* cur=running_thread();
 	cur->status=stat;
+	//put_str("block self is called\n");
 	schedule();//线程阻塞自己 调度新线程 由于自己的状态被设置为上述三种之一 因此
 	//在schedule中不会将其加入ready链表中 只能等待其他线程来唤醒
 	//唤醒后回到这里 关闭中断 出thread_block()函数

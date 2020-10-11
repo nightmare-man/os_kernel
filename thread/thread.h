@@ -5,7 +5,7 @@
 #include "../lib/kernel/memory.h"
 typedef void(*thread_func)(void*);
 //thread_func即是 函数变量类型
-
+#define default_prio 31
 
 //tcb thread control block 分布
 // 从低到高 task_struct  thread_stack intr_stack
@@ -87,7 +87,7 @@ struct task_struct{
 		// 列表里只有elem没有 task_struct 都是通过前面定义的elem2entry反推task_struct的地址的
 	
 	uint32_t* pgdir;//执行流的页表的虚拟地址 如果为线程 该项为NULL 
-	struct virtual_addr userprog_vaddr;
+	struct virtual_addr userprog_vaddr;//虚拟内存池
 	uint32_t stack_magic;
 	// 按照栈从上往下 分布的原则 从stack_magic以上到self_kstack之间都是线程使用的栈空间
 	//stack_magic检测 在边界防止破坏PCB除栈以外的信息
@@ -95,7 +95,9 @@ struct task_struct{
 
 struct task_struct* thread_start(char*name,int prio,thread_func func,void*func_arg);
 struct task_struct* running_thread();
-void thread_init(void);
+void thread_init(void);//而此函数则是对main函数的默认执行流封装成线程
+void init_thread(struct task_struct* pthread,char*name,int prio);//此函数对tcb初始化
+void thread_create(struct task_struct*pthread,thread_func func,void*arg);//此函数初始化tcb中的thread_stack，提供新线程/进程第一次执行流的上下文
 void schedule();
 void thread_block(enum task_status stat);
 void thread_unblock(struct task_struct*tar);

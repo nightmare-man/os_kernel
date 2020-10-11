@@ -12,6 +12,7 @@
 #include "../thread/thread.h"
 #include "../lib/kernel/timer.h"
 #include "../lib/kernel/debug.h"
+#include "../lib/user/tss.h"
 //#include "global.h"
 #define IDT_DESC_CNT 0x22 //目前支持的中断数
 //2020-9-20 加入idt中键盘中断
@@ -24,7 +25,7 @@
 #define PIC_M_DATA 0x21 //数据端口
 #define PIC_S_CTRL 0xa0 //从片 控制端口
 #define PIC_S_DATA 0xa1 //从片数据端口
-
+extern struct tss tss;
 uint32_t ticks;// 系统启动以来的总ticks
 
 
@@ -79,7 +80,23 @@ static void general_intr_handler(uint8_t vec_nr){
 
 static void intr_timer_handler(void){
 	struct task_struct* cur_thread=running_thread();
-	ASSERT(cur_thread->stack_magic==0x19980114);//对边缘进行检测 如果magic number不对 说明栈溢出修改了
+	if(cur_thread->stack_magic!=0x19980114){
+
+		uint32_t esp_temp;
+		put_str("esp0 is:");
+		asm volatile("movl %%esp,%0":"=g"(esp_temp));
+		put_int((uint32_t)esp_temp);
+		put_char('\n');
+		put_str("cur is:");
+		put_int((uint32_t)cur_thread);
+		put_char('\n');
+		put_str("tss esp0 is:");
+		put_int((uint32_t)tss.esp0);
+		put_char('\n');
+		while(1);
+	}
+	
+	//ASSERT(cur_thread->stack_magic==0x19980114);//对边缘进行检测 如果magic number不对 说明栈溢出修改了
 
 	//ticks相关
 	ticks++;

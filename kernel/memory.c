@@ -232,9 +232,6 @@ void* malloc_page(enum pool_flags pf,uint32_t cnt){
 	//再分配物理地址 不同的是 物理地址是一页一页分配的 不是连续的
 	while(pg_cnt--){
 		void*page_phyaddr=palloc(mem_pool);
-		put_str("phy addr:");
-		put_int((uint32_t)page_phyaddr);
-		put_char('\n');
 		if(page_phyaddr==NULL){
 			return NULL;
 		}

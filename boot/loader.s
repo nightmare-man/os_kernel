@@ -19,10 +19,6 @@ GDT_LIMIT equ  GDT_SIZE-1
 times 120 dd 0;预留60个段描述符
 
 
-SELECTOR_CODE equ (0x0001<<3) + TI_GDT + RPL0
-SELECTOR_DATA equ (0x0002<<3) + TI_GDT + RPL0
-SELECTOR_VIDEO equ (0x0003<<3) + TI_GDT + RPL0
-
 gdt_ptr dw GDT_LIMIT
         dd GDT_BASE
 

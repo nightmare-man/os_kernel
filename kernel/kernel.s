@@ -41,7 +41,7 @@ out 0x20,al;发送给主片
 
 push %1;传入中断号 不管handler用不用
 call [idt_table+ %1 *4];间接跳转到handler入口地址
-add esp,4;跳过传入的参数
+
 jmp intr_exit
 
 section .data
@@ -51,6 +51,7 @@ dd intr_%1_entry ;将处理程序有效地址写到.data节
 section .text
 global intr_exit
 intr_exit:
+add esp,4;跳过传入的参数
 popad
 pop gs
 pop fs

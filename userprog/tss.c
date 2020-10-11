@@ -6,39 +6,18 @@
 #include "../lib/user/tss.h"
 #include "../lib/string.h"
 #include "../lib/kernel/debug.h"
-struct tss{
-	uint32_t backlink;//指向调用此任务的任务的tss
-	uint32_t*esp0;
-	uint32_t ss0;
-	uint32_t*esp1;
-	uint32_t ss1;
-	uint32_t*esp2;
-	uint32_t ss2;
-	uint32_t cr3;
-	uint32_t (*eip)(void);//将eip所在指令定义成一个函数 可以直接执行eip()
-	uint32_t eflags;
-	uint32_t eax;
-	uint32_t ecx;
-	uint32_t edx;
-	uint32_t ebx;
-	uint32_t esp;
-	uint32_t ebp;
-	uint32_t esi;
-	uint32_t edi;
-	uint32_t es;
-	uint32_t cs;
-	uint32_t ss;
-	uint32_t ds;
-	uint32_t fs;
-	uint32_t gs;
-	uint32_t ldt;
-	uint32_t trace;
-	uint32_t io_base;
-};
-static struct tss tss;
 
-//更新tss中的esp0 为线程的 tcb顶
-//更新tss栈顶即是切换进程 因为timer中断会把任何进程/线程带到其内核态（0特权级）使用esp0来切换上下文
+struct tss tss;
+
+
+//在切换到新进程时 什么时候会将esp设置为tss中的esp0？
+//我们知道，只有在从低特权级的进程的用户态（特权级3）转移到该进程的内核态（特权级0）才会，才会由cpu自动读tss的esp0
+//而我们切换到新进程时，是先切换到该进程的内核态，再由内核态构建上下文返回到其用户态，因此这个过程中处理器不会自动
+//给我们将esp指向esp0，因此我们可以在切换到该进程的内核态时，还来得及设置tss的esp0。切换到了新进程的用户态后，再要是
+//发生中断，那么处理器就自动设置esp为esp0 
+
+//以下函数设置进程的tss的esp0，而不是立即改变esp，设置了tss的esp0，这样进程在运行时才能正常切换到其内核态，正常响应
+//中断
 void update_tss_esp(struct task_struct* pthread){
 	tss.esp0=(uint32_t*)( (uint32_t)pthread+PG_SIZE);
 }

@@ -17,6 +17,7 @@
 #include "../lib/kernel/print.h"
 #include "../device/ioqueue.h"
 #include "../device/keyboard.h"
+#include "../lib/user/process.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -40,15 +41,16 @@
 //都是对某个内存地址的别名，里面的数据都可以通过访问这个地址对应的空间得到
 //所以 trans_table对应的变量类型是char而不是char* 我们这里说的类型是这个别名对应的数据
 //的类型，而不是说别名本身是什么
-void func1(void*);
-void func2(void*);
+void func1(void*str);
+void func2();
 int main(){
 	put_str("\nthis is kernel\n");
 	init_all();
+	
+	thread_start("thread1",31,func1,"this is thread1\n");
+	thread_start("thread2",31,func1,"this is thread2\n");
+	process_execute(func2,"user_func2");
 	intr_enable();
-	get_a_page(PF_KERNEL,(uint32_t)0xcccc0000);
-	//thread_start("thread1",31,func1,"func1_consume:");
-	//thread_start("thread2",31,func2,"func2_consume:");
     while(1){
 		
 	}
@@ -74,21 +76,11 @@ int main(){
 //这个时候就死锁了 
 void func1(void*str){
 	while(1){
-		enum intr_status old_status=intr_disable();
-		char byte=ioq_getchar(&kbd_buf);
-		console_put_str(str);
-		console_put_char(byte);
-		console_put_char(' ');
-		intr_set_status(old_status);
+		put_str(str);
 	}
 }
-void func2(void*str){
+void func2(){
 	while(1){
-		enum intr_status old_status=intr_disable();
-		char byte=ioq_getchar(&kbd_buf);
-		console_put_str(str);
-		console_put_char(byte);
-		console_put_char(' ');
-		intr_set_status(old_status);
+		put_str("this is user_prog\n");
 	}
 }
