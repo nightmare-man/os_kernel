@@ -44,15 +44,15 @@
 void func1(void*str);
 void func2();
 int main(){
-	put_str("\nthis is kernel\n");
+	//put_str("\nthis is kernel\n");
 	init_all();
 	
-	thread_start("thread1",31,func1,"this is thread1\n");
-	thread_start("thread2",31,func1,"this is thread2\n");
-	process_execute(func2,"user_func2");
+	thread_start("thread1",31,func1,"thfunc1 ");
+	thread_start("thread2",31,func1,"thfunc2 ");
+	process_execute(func2,"unc2 ");
 	intr_enable();
     while(1){
-		
+		console_put_str("main ");
 	}
     return 0;
 }
@@ -76,11 +76,11 @@ int main(){
 //这个时候就死锁了 
 void func1(void*str){
 	while(1){
-		put_str(str);
+		console_put_str(str);
 	}
 }
 void func2(){
 	while(1){
-		put_str("this is user_prog\n");
+		//console_put_str("userp ");
 	}
 }

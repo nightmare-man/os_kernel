@@ -18,8 +18,8 @@ void sema_down(struct semaphore*psema){
 		ASSERT(!elem_find(&psema->waiters,&running_thread()->general_tag));//当前进程不应该在等待队列
 		//（等待队列里状态都是block等）
 		list_append(&psema->waiters,&running_thread()->general_tag);//psema->value=0无法拿到锁 直接阻塞 加入等待队列
-		put_int((uint32_t)running_thread());
-		put_str("block itself\n");
+
+
 		thread_block(TASK_BLOCKED);
 	}
 	psema->value--;
@@ -33,10 +33,10 @@ void sema_up(struct semaphore*psema){
 	if(!list_empty(&psema->waiters)){
 		struct task_struct*thread_blocked =elem2entry(struct task_struct,general_tag,list_pop(&psema->waiters));
 		//取出 阻塞线程最前一个tcb 并unblock
-		put_int((uint32_t)running_thread);
-		put_str("unblock:");
-		put_int((uint32_t)thread_blocked);
-		put_char('\n');
+
+
+
+
 		thread_unblock(thread_blocked);
 	}
 	psema->value++;
@@ -46,17 +46,17 @@ void sema_up(struct semaphore*psema){
 
 //以下试图获得锁 ，有的持有者 才对该锁对应的公共资源有访问权（试图获得锁而没有持有者都在该锁的阻塞队列）
 void lock_acquire(struct lock*plock){
-	put_str("acquire lock:");
-		put_int((uint32_t)plock);
-		put_char(' ');
-	
-	put_str("lock owner:");
-		put_int((uint32_t)plock->owner);
-		put_char(' ');
 
-	put_str("running thread:");
-		put_int((uint32_t)running_thread());
-		put_char('\n');
+
+
+	
+
+
+
+
+
+
+
 	if(plock->owner!=running_thread()){
 		//当前线程不是锁的持有者时
 		
@@ -74,9 +74,9 @@ void lock_acquire(struct lock*plock){
 //因为 如果先把锁个一个线程 但是没有P操作 那么如果被中断了 ，内核试图去释放这个锁的时候 就会出问题
 //V操作时的顺序恰好相反 先要去除owner
 void lock_release(struct lock*plock){
-	put_str("release lock:");
-		put_int((uint32_t)plock);
-		put_char('\n');
+
+
+
 	ASSERT(plock->owner==running_thread());//只能释放自己拥有的锁
 	if(plock->holder_repeat_nr>1){
 		//如果多次申请了 释放一次是不行的
