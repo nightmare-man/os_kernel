@@ -53,6 +53,15 @@ int main(){
 	intr_enable();
     while(1){
 		console_put_str("main ");
+		//这里有必要说明下 由于线程里是while ， 不断获取锁 执行 put_str 释放锁， 因此put_str里的字符越少越好，太多了会导致 该线程被换下时大概率没有
+		//释放锁，因此其他同样使用console_put需要锁的线程即使被换上，也会立马阻塞自己，导致退化成单线程
+		//另外 千万要记得 处于多线程环境后，所有的公共资源都要加锁使用，再不能直接用put_str,会导致设置光标错位，导致访问超过viode segment的边界，造成
+		//General Protection
+		//最后，关于userprocess 由于处于特权级3，无法使用put_str(因为这个函数中要访问dpl0的video segment，虽然已经被我把这个dpl改成3了，hhh)。
+		//另外cpl3的userprocess无法执行端口io，所以也无法使用put_str（因为涉及读写光标，虽然也被我改了eflags 里的IOPL为3了，可以访问了）
+		//但是再怎么样也无法直接使用console_put函数，因为如果获取锁时阻塞了自己，那么需要调用开关中断函数，sti cli指令是cpl3时永远无法执行的
+		//经测试，userprocess cpl为0时（通过设置startprocess里的cs）是可以执行console_put的
+		//想在cpl3下执行这些操作硬件或者公共资源的想法是不好的，还是要通过系统调用，下一章即是，未完待续！！！
 	}
     return 0;
 }
