@@ -1,4 +1,4 @@
-%include "boot.inc"
+%include "include/boot.inc"
 ;引入头文件，和c中.h没区别 直接加进来，主要写一些宏
 SECTION MBR vstart=0x7c00
     mov ax,0

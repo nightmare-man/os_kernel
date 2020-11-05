@@ -18,6 +18,7 @@
 #include "../device/ioqueue.h"
 #include "../device/keyboard.h"
 #include "../lib/user/process.h"
+#include "../lib/user/syscall.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -41,18 +42,33 @@
 //都是对某个内存地址的别名，里面的数据都可以通过访问这个地址对应的空间得到
 //所以 trans_table对应的变量类型是char而不是char* 我们这里说的类型是这个别名对应的数据
 //的类型，而不是说别名本身是什么
+
 void func1(void*str);
-void func2();
+void func2(void*str);
+void u_prog_a();
+void u_prog_b();
+int prog_a_pid=-1;
+int prog_b_pid=-1;
 int main(){
-	//put_str("\nthis is kernel\n");
+	
 	init_all();
 	
-	thread_start("thread1",31,func1,"thfunc1 ");
-	thread_start("thread2",31,func1,"thfunc2 ");
-	process_execute(func2,"unc2 ");
-	intr_enable();
+	
+	process_execute(u_prog_a,"user_prog_a");
+	process_execute(u_prog_b,"user_prog_b");
+
+
+	console_put_str("main pid:0x");
+	console_put_int(getpid());
+	console_put_str("\n");
+
+	thread_start("thread1",31,func1,"t1 ");
+	thread_start("thread2",31,func2,"t2 ");
+
+	intr_enable();	//intr_enable必须在init_all之后调用，因为init_all里的初始化函数使用了put_str 这个时候不允许多线程
+	
     while(1){
-		console_put_str("main ");
+		
 		//这里有必要说明下 由于线程里是while ， 不断获取锁 执行 put_str 释放锁， 因此put_str里的字符越少越好，太多了会导致 该线程被换下时大概率没有
 		//释放锁，因此其他同样使用console_put需要锁的线程即使被换上，也会立马阻塞自己，导致退化成单线程
 		//另外 千万要记得 处于多线程环境后，所有的公共资源都要加锁使用，再不能直接用put_str,会导致设置光标错位，导致访问超过viode segment的边界，造成
@@ -84,12 +100,29 @@ int main(){
 //释放了 那干嘛还拿锁，）？（但是这一条我没深想 后面再想想？）
 //这个时候就死锁了 
 void func1(void*str){
-	while(1){
-		console_put_str(str);
-	}
+	console_put_str("thread_1_pid:0x");
+	console_put_int(getpid());
+	console_put_str("\n");
+	console_put_str("prog_a_pid:0x");
+	console_put_int(prog_a_pid);
+	console_put_str("\n");
+	while(1);
 }
-void func2(){
-	while(1){
-		//console_put_str("userp ");
-	}
+void func2(void*str){
+	console_put_str("thread_2_pid:0x");
+	console_put_int(getpid());
+	console_put_str("\n");
+	console_put_str("prog_b_pid:0x");
+	console_put_int(prog_b_pid);
+	console_put_str("\n");
+	while(1);
+}
+
+void u_prog_a(void){
+	prog_a_pid=getpid();
+	while(1);
+}
+void u_prog_b(void){
+	prog_b_pid=getpid();
+	while(1);
 }

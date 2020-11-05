@@ -3,7 +3,10 @@
 #include "./stdint.h"
 #include "../lib/kernel/list.h"
 #include "../lib/kernel/memory.h"
+#include "../thread/sync.h"
 typedef void(*thread_func)(void*);
+typedef uint32_t pid_t;
+
 //thread_func即是 函数变量类型
 #define default_prio 31
 
@@ -74,10 +77,12 @@ struct thread_stack{
 //通过这两个参数可以访问旧线程和新线程的栈顶，此时线程B的栈顶 不再一定是这个结构thread_stack的起始地址,压入的返回地址
 //也只是schedule中switch调用结束下一条语句的地址
 };
+
 struct task_struct{
 	uint32_t*self_kstack;//用于保存调度中的栈顶，通过这个栈顶的保存恢复来切换栈
 	enum task_status status;
 	uint8_t priority;
+	pid_t pid;
 	char name[16];
 	uint8_t ticks;//每次被处理器执行的时间 （滴答计数）（倒计时 每次滴答该数-1 到0就被换下,被换上时初值由priority决定）
 	uint32_t elapsed_ticks;//该执行流被执行的总时间

@@ -47,16 +47,6 @@ void sema_up(struct semaphore*psema){
 //以下试图获得锁 ，有的持有者 才对该锁对应的公共资源有访问权（试图获得锁而没有持有者都在该锁的阻塞队列）
 void lock_acquire(struct lock*plock){
 
-
-
-	
-
-
-
-
-
-
-
 	if(plock->owner!=running_thread()){
 		//当前线程不是锁的持有者时
 		

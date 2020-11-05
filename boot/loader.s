@@ -170,15 +170,42 @@ test dword [ebx+8],0x80000000
 jz .ptnull
 test dword [ebx+8],0x40000000
 jz .ptnull
+;如果segment的文件大小和内存大小不一致 说明是data段（bss节的存在导致），那我们就要按照文件大小复制 但是置0 内存大小-文件大小字节
 
-push dword [ebx+20];压入segment大小
+push dword [ebx+16];压入segment大小
 mov eax,[ebx+4];压入segment在文件里的起始偏移地址
 add eax,KERNEL_BIN_VIRTUAL_ADDR;拿到segment在缓冲区的虚拟地址
 push eax;压入要复制的起始地址
 push dword [ebx+8];压入segment想要的的虚拟地址
 call mem_cpy
 add esp,12;跳过三个参数
+
+push eax
+push ebx
+push ecx
+push esi
+
+mov eax,[ebx+20]
+cmp eax,[ebx+16]
+jna .clearend
+sub eax,[ebx+16]
+mov ecx,eax
+mov eax,[ebx+8]
+add eax,[ebx+16]
+mov esi,eax
+mov eax,0
+.clearbss:
+mov byte [esi+eax],0
+inc eax
+loop .clearbss
+.clearend:
+pop esi
+pop ecx
+pop ebx
+pop eax
+
 .ptnull:
+
 add ebx,edx
 loop .each_segment
 ret

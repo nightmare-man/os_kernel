@@ -14,7 +14,7 @@
 #include "../lib/kernel/debug.h"
 #include "../lib/user/tss.h"
 //#include "global.h"
-#define IDT_DESC_CNT 0x22 //目前支持的中断数
+#define IDT_DESC_CNT 0x81 //目前支持的中断数 0-0x80 0x80为syscall 中断
 //2020-9-20 加入idt中键盘中断
 #define EFLAGS_IF 0x00000200 //IF位为1
 #define GET_EFLAGS(EFLAG_VAR) asm volatile("pushfl;popl %0":"=g"(EFLAG_VAR))
@@ -37,7 +37,7 @@ struct gate_desc{
     uint8_t attribute;//属性8位
     uint16_t func_offset_high_word;//中断处理程序偏移地址高16位
 };
-static struct gate_desc idt[IDT_DESC_CNT];//static的本质是在生成的符号时为gobal，链接时不能被其他模块引用
+static struct gate_desc idt[IDT_DESC_CNT];//static的本质是在符号表（symbol tabl）里为local，链接时不能被其他模块引用
 
 
 char* intr_name[IDT_DESC_CNT];//对每个中断做一个说明
@@ -153,7 +153,7 @@ static void exception_init(void){
 
 
 
-static void make_idt_desc(struct gate_desc* p_gdesc,uint8_t attr,intr_handler function){
+static void make_idt_desc(struct gate_desc* p_gdesc,uint8_t attr,intr_handler function){	
     p_gdesc->func_offset_low_word=((uint32_t)function) & 0x0000ffff;
     p_gdesc->selector=SELECTOR_K_CODE;
     p_gdesc->dcount=0;
@@ -162,9 +162,14 @@ static void make_idt_desc(struct gate_desc* p_gdesc,uint8_t attr,intr_handler fu
 }
 static void idt_desc_init(void){
     int i;
-    for(i=0;i<IDT_DESC_CNT;i++){
+	int lastindex=(IDT_DESC_CNT-1);//0X80 SYS_CALL
+    for(i=0;i<0x22;i++){
         make_idt_desc(&idt[i],IDT_DESC_ATTR_DPL0,intr_entry_table[i]);
     }
+	put_int((uint32_t)intr_entry_table[0x22]);
+	put_char('\n');
+	make_idt_desc(&idt[lastindex],IDT_DESC_ATTR_DPL3,intr_entry_table[0x22]);
+	//使用idt desc attr dpl3 这样就可以在三特权级 用int 0x80 调用
     put_str("idt_desc_init done!\n");
 }
 static void pic_init(void){

@@ -12,8 +12,9 @@ struct task_struct*main_thread;//主线程tcb thread control block
 struct list thread_ready_list;//就绪队列
 struct list thread_all_list;//全部线程队列
 static struct list_elem* thread_tag;//零时保存节点
-
+struct lock pid_lock;//用来保存pid已经分配到哪里的锁 
 extern void switch_to(struct task_struct*cur,struct task_struct*next);//用汇编写的 switch_to函数 用来切换线程
+static uint32_t next_pid=0;//静态局部变量 保存在全局区 而不是栈
 
 //下面函数获取当前正在运行的线程，原理是线程运行时esp会在其 task_struct 也就是tcb中 tcb大小为0x1000 对esp取整就是
 struct task_struct* running_thread(){
@@ -21,7 +22,13 @@ struct task_struct* running_thread(){
 	asm volatile("movl %%esp,%0":"=g"(esp));
 	return (struct task_struct*)(esp&0xfffff000);
 }
-
+static pid_t allocate_pid(void){
+	
+	lock_acquire(&pid_lock);
+	next_pid++;
+	lock_release(&pid_lock);
+	return next_pid;
+}
 //以下函数 被调用后会执行线程函数（由switch_to函数调用）
 static void kernel_thread(thread_func func,void*arg){
 	intr_enable();//执行线程函数前 要开中断 不然无法将其换下
@@ -52,7 +59,7 @@ void init_thread(struct task_struct* pthread,char*name,int prio){
 	}else{
 		pthread->status=TASK_READY;
 	}
-
+	pthread->pid=allocate_pid();
 	pthread->elapsed_ticks=0;//总执行时间初始为0
 	pthread->pgdir=NULL;//线程没有页表
 	pthread->priority=prio;
@@ -135,12 +142,13 @@ void schedule(){
 }
 void thread_init(void){
 	
-
+	put_str("thread_init start\n");
 	list_init(&thread_all_list);//对两个链表进行初始化
 	list_init(&thread_ready_list);
+	lock_init(&pid_lock);
 	ASSERT(list_empty(&thread_ready_list)==true);
 	make_main_thread();//给主线程 初始化tcb和加入队列
-
+	put_str("thread_init done\n");
 }
 
 //以下为线程阻塞函数，只能阻塞自己

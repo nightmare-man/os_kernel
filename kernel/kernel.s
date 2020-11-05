@@ -51,7 +51,7 @@ dd intr_%1_entry ;将处理程序有效地址写到.data节
 section .text
 global intr_exit
 intr_exit:
-add esp,4;跳过传入的参数
+add esp,4;跳过传入的参数 中断号
 popad
 pop gs
 pop fs
@@ -104,3 +104,29 @@ VECTOR 0x1F,ZERO
 VECTOR 0x20,ZERO;//时钟中断 主片IR0
 VECTOR 0x21,ZERO;//键盘8042中断 主片IR1 0X21
 
+
+
+;以下为syscall_handler 即0x80中断处理程序及数据结构
+[bits 32]
+extern syscall_table;调用c语言里定义的全局表
+section .text
+global syscall_handler;给interrupt.c里init idt_desc_init用
+syscall_handler:
+push 0;（不需要errorcode 强行push0 保持栈格式一致）
+push ds
+push es
+push fs
+push gs
+pushad
+push 0x80;(不需要压入中断号，强行保持一致)
+push edx;参数三
+push ecx;参数二
+push ebx;参数一 实际上这三个已经在pushad里入栈了 再入栈一次是为了按照cdecl 约定给函数传参数
+
+call [syscall_table+eax*4];调用syscall——table里的函数
+add esp,12;跳过传入的参数
+
+mov [esp+8*4],eax;将syscall_table返回值eax 写入到栈里eax的地方（eax在pushad时入栈了 intr_exit会将eaxpop为esp+8*4位置的值）
+jmp intr_exit
+section .data
+dd syscall_handler
