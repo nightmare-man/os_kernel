@@ -169,7 +169,11 @@ static void idt_desc_init(void){
 	put_int((uint32_t)intr_entry_table[0x22]);
 	put_char('\n');
 	make_idt_desc(&idt[lastindex],IDT_DESC_ATTR_DPL3,intr_entry_table[0x22]);
-	//使用idt desc attr dpl3 这样就可以在三特权级 用int 0x80 调用
+	//硬件中断不检查特权级，因此idt_desc的dpl怎么设置都行
+	//但是软中断（int调用的） 要检查dpl 因此设置为3 
+	//但是目标代码段仍然是内核代码段 特权级为0，中断和调用门均可从特权级3转移到0 （依从代码可执行 但是特权级不变）
+	//而唯一降低权限的方法是ret返回（为什么不允许主动call 降权，因为主动call降权，就意味着ret可以升权，那么任意特权级3的代码都可以
+	//构造栈来主动ret升权了）
     put_str("idt_desc_init done!\n");
 }
 static void pic_init(void){

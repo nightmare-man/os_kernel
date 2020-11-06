@@ -100,29 +100,19 @@ int main(){
 //释放了 那干嘛还拿锁，）？（但是这一条我没深想 后面再想想？）
 //这个时候就死锁了 
 void func1(void*str){
-	console_put_str("thread_1_pid:0x");
-	console_put_int(getpid());
-	console_put_str("\n");
-	console_put_str("prog_a_pid:0x");
-	console_put_int(prog_a_pid);
-	console_put_str("\n");
+	write("thread_1\n");
 	while(1);
 }
 void func2(void*str){
-	console_put_str("thread_2_pid:0x");
-	console_put_int(getpid());
-	console_put_str("\n");
-	console_put_str("prog_b_pid:0x");
-	console_put_int(prog_b_pid);
-	console_put_str("\n");
+	write("thread_2\n");
 	while(1);
 }
 
 void u_prog_a(void){
-	prog_a_pid=getpid();
+	write("prog_a\n");
 	while(1);
 }
 void u_prog_b(void){
-	prog_b_pid=getpid();
+	write("prog_b\n");
 	while(1);
 }
