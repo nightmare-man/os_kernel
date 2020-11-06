@@ -54,13 +54,13 @@ int main(){
 	init_all();
 	
 	
-	process_execute(u_prog_a,"user_prog_a");
-	process_execute(u_prog_b,"user_prog_b");
+	// process_execute(u_prog_a,"user_prog_a");
+	// process_execute(u_prog_b,"user_prog_b");
 
 
-	console_put_str("main pid:0x");
-	console_put_int(getpid());
-	console_put_str("\n");
+	// console_put_str("main pid:0x");
+	// console_put_int(getpid());
+	// console_put_str("\n");
 
 	thread_start("thread1",31,func1,"t1 ");
 	thread_start("thread2",31,func2,"t2 ");
@@ -100,12 +100,26 @@ int main(){
 //释放了 那干嘛还拿锁，）？（但是这一条我没深想 后面再想想？）
 //这个时候就死锁了 
 void func1(void*str){
-	write("thread_1\n");
-	while(1);
+	
+	while(1){
+		enum intr_status old= intr_disable();
+		if(!ioq_empty(&kbd_buf)){
+	 	console_put_str(" t1:");
+		console_put_char(ioq_getchar(&kbd_buf));
+		}
+		intr_set_status(old);
+	}
 }
 void func2(void*str){
-	write("thread_2\n");
-	while(1);
+	while(1){
+		enum intr_status old= intr_disable();
+		if(!ioq_empty(&kbd_buf)){
+	 	console_put_str(" t2:");
+		console_put_char(ioq_getchar(&kbd_buf));
+		}
+		
+		intr_set_status(old);
+	}
 }
 
 void u_prog_a(void){

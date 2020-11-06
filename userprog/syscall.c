@@ -3,6 +3,7 @@
 #include "../thread/thread.h"
 #include "../lib/kernel/print.h"
 #include "../device/console.h"
+#include "../lib/string.h"
 #define syscall_nr 32
 #define _syscall0(NUMBER) ({int retval;asm volatile("int $0x80":"=a"(retval):"a"(NUMBER):"memory");retval;})
 
@@ -18,7 +19,7 @@ uint32_t sys_getpid(void){
 }
 uint32_t sys_write(char*str){
 	console_put_str(str);
-	return (uint32_t)str;
+	return strlen(str);
 }
 void syscall_init(void){
 	put_str("syscall_init start\n");
