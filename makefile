@@ -21,32 +21,23 @@ OBJS = ${BUILD_DIR}/main.o ${BUILD_DIR}/init.o ${BUILD_DIR}/interrupt.o ${BUILD_
 
 
 #####以下是编译部分
-${BUILD_DIR}/main.o:kernel/main.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/string.h
+${BUILD_DIR}/main.o:kernel/main.c
 	${CC} ${CFLAGS} $< -o $@
-${BUILD_DIR}/init.o:kernel/init.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
-	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h
+${BUILD_DIR}/init.o:kernel/init.c lib/kernel/init.h
 	${CC} ${CFLAGS} $< -o $@
-${BUILD_DIR}/interrupt.o:kernel/interrupt.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
-	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h
+${BUILD_DIR}/interrupt.o:kernel/interrupt.c lib/kernel/interrupt.h
 	${CC} ${CFLAGS} $< -o $@
-${BUILD_DIR}/timer.o:device/timer.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
-	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h
+${BUILD_DIR}/timer.o:device/timer.c lib/kernel/timer.h
 	${CC} ${CFLAGS} $< -o $@
-${BUILD_DIR}/debug.o:kernel/debug.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
-	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h
+${BUILD_DIR}/debug.o:kernel/debug.c lib/kernel/debug.h
 	${CC} ${CFLAGS} $< -o $@
-${BUILD_DIR}/string.o:lib/string.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
-	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h lib/string.h
+${BUILD_DIR}/string.o:lib/string.c lib/string.h
 	${CC} ${CFLAGS} $< -o $@
-${BUILD_DIR}/bitmap.o:kernel/bitmap.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
-	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h lib/string.h lib/kernel/bitmap.h
+${BUILD_DIR}/bitmap.o:kernel/bitmap.c lib/kernel/bitmap.h
 	${CC} ${CFLAGS} $< -o $@
-${BUILD_DIR}/memory.o:kernel/memory.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
-	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h lib/string.h lib/kernel/bitmap.h lib/kernel/memory.h
+${BUILD_DIR}/memory.o:kernel/memory.c lib/kernel/memory.h
 	${CC} ${CFLAGS} $< -o $@
-${BUILD_DIR}/thread.o:thread/thread.c lib/kernel/print.h lib/kernel/init.h lib/kernel/debug.h lib/kernel/stdint.h\
-	lib/kernel/interrupt.h lib/kernel/io.h lib/kernel/timer.h lib/string.h lib/kernel/bitmap.h lib/kernel/memory.h\
-	thread/thread.h
+${BUILD_DIR}/thread.o:thread/thread.c thread/thread.h
 	${CC} ${CFLAGS} $< -o $@
 ${BUILD_DIR}/list.o:kernel/list.c lib/kernel/list.h
 	${CC} ${CFLAGS} $< -o $@

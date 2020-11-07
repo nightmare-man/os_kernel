@@ -1,6 +1,7 @@
 #include "../lib/user/stdio.h"
 #include "../lib/kernel/stdint.h"
 #include "../lib/kernel/print.h"
+#include "../lib/string.h"
 //获取第一个参数的地址（即是v的首地址 va_list是编译器内建类型 实质是 void*）
 #define va_start(ap,v) ap=(va_list)&v
 //获取下一个参数的值（va_list类型实际是void* 每次指针+4 指向下一个参数，通过传入类型t 强制指针类型转换 再*读出值）
@@ -28,6 +29,35 @@ void itoa(uint32_t value,char**buf_ptr_addr,uint8_t base){
 uint32_t vsprintf(char*str,const char* format,va_list ap){
 	char*buf_ptr=str;
 	const char* index_ptr=format;
-
-	//..待续
+	char index_char=*index_ptr;
+	int32_t arg_int;
+	while(index_char){
+		if(index_char!='%'){
+			//普通字符直接复制
+			*(buf_ptr++)=index_char;
+			index_char=*(++index_ptr);
+			continue;
+		}
+		index_char=*(++index_ptr);
+		switch (index_char)
+		{
+		case 'x':
+			arg_int=va_arg(ap,int);//返回参数列表里下一个int的值
+			itoa(arg_int,&buf_ptr,16);
+			index_char=*(++index_ptr);
+			break;
+		
+		default:
+			break;
+		}
+	}
+	return strlen(str);
+}
+uint32_t printf(const char*format,...){
+	va_list args;
+	va_start(args,format);//根据第一个参数的位置，取得参数列表的位置
+	char buf[1024]={0};
+	vsprintf(buf,format,args);
+	va_end(args);
+	return write(buf);
 }

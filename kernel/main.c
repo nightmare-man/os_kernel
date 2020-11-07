@@ -49,8 +49,7 @@ void func2(void*str);
 void u_prog_a();
 void u_prog_b();
 
-int prog_a_pid=-1;
-int prog_b_pid=-1;
+
 
 
 int main(){
@@ -58,17 +57,15 @@ int main(){
 	init_all();
 	
 	
-	// process_execute(u_prog_a,"user_prog_a");
-	// process_execute(u_prog_b,"user_prog_b");
 
 
-	// console_put_str("main pid:0x");
-	// console_put_int(getpid());
-	// console_put_str("\n");
+
+	printf("main thread pid is %x\n",getpid());
 
 	thread_start("thread1",31,func1,"t1 ");
 	thread_start("thread2",31,func2,"t2 ");
-
+	process_execute(u_prog_a,"user_prog_a");
+	process_execute(u_prog_b,"user_prog_b");
 	intr_enable();	//intr_enable必须在init_all之后调用，因为init_all里的初始化函数使用了put_str 这个时候不允许多线程
 	
     while(1){
@@ -104,33 +101,24 @@ int main(){
 //释放了 那干嘛还拿锁，）？（但是这一条我没深想 后面再想想？）
 //这个时候就死锁了 
 void func1(void*str){
+	printf("thread1 pid is %x\n",getpid());
 	
 	while(1){
-		enum intr_status old= intr_disable();
-		if(!ioq_empty(&kbd_buf)){
-	 	console_put_str(" t1:");
-		console_put_char(ioq_getchar(&kbd_buf));
-		}
-		intr_set_status(old);
+		
 	}
 }
 void func2(void*str){
+	printf("thread2 pid is %x\n",getpid());
 	while(1){
-		enum intr_status old= intr_disable();
-		if(!ioq_empty(&kbd_buf)){
-	 	console_put_str(" t2:");
-		console_put_char(ioq_getchar(&kbd_buf));
-		}
 		
-		intr_set_status(old);
 	}
 }
 
 void u_prog_a(void){
-	write("prog_a\n");
+	printf("prog_a pid is %x\n",getpid());
 	while(1);
 }
 void u_prog_b(void){
-	write("prog_b\n");
+	printf("prog_b pid is %x\n",getpid());
 	while(1);
 }
