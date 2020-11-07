@@ -19,6 +19,7 @@
 #include "../device/keyboard.h"
 #include "../lib/user/process.h"
 #include "../lib/user/syscall.h"
+#include "../lib/user/stdio.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -47,8 +48,11 @@ void func1(void*str);
 void func2(void*str);
 void u_prog_a();
 void u_prog_b();
+
 int prog_a_pid=-1;
 int prog_b_pid=-1;
+
+
 int main(){
 	
 	init_all();
