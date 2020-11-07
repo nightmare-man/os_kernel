@@ -31,6 +31,7 @@ uint32_t vsprintf(char*str,const char* format,va_list ap){
 	const char* index_ptr=format;
 	char index_char=*index_ptr;
 	int32_t arg_int;
+	char* arg_str;
 	while(index_char){
 		if(index_char!='%'){
 			//普通字符直接复制
@@ -41,8 +42,27 @@ uint32_t vsprintf(char*str,const char* format,va_list ap){
 		index_char=*(++index_ptr);
 		switch (index_char)
 		{
+		case 's':
+			arg_str=va_arg(ap,char*);
+			strcpy(buf_ptr,(const char*)arg_str);
+			buf_ptr+=strlen((const char*)arg_str);
+			index_char=*(++index_ptr);
+			break;
+		case 'd':
+			arg_int=va_arg(ap,int32_t);
+			if(arg_int<0){
+				*(buf_ptr++)='-';
+				arg_int=0-arg_int;
+			}
+			itoa(arg_int,&buf_ptr,10);
+			index_char=*(++index_ptr);
+			break;
+		case 'c':
+			*(buf_ptr++)=va_arg(ap,char);
+			index_char=*(++index_ptr);
+			break; 
 		case 'x':
-			arg_int=va_arg(ap,int);//返回参数列表里下一个int的值
+			arg_int=va_arg(ap,int32_t);//返回参数列表里下一个int的值
 			itoa(arg_int,&buf_ptr,16);
 			index_char=*(++index_ptr);
 			break;
@@ -53,6 +73,7 @@ uint32_t vsprintf(char*str,const char* format,va_list ap){
 	}
 	return strlen(str);
 }
+//利用vsprintf 输出格式化字符串到 终端
 uint32_t printf(const char*format,...){
 	va_list args;
 	va_start(args,format);//根据第一个参数的位置，取得参数列表的位置
@@ -60,4 +81,13 @@ uint32_t printf(const char*format,...){
 	vsprintf(buf,format,args);
 	va_end(args);
 	return write(buf);
+}
+
+//利用vsprintf 输出格式化字符串到 buf
+uint32_t sprintf(char*buf,const char*format,...){
+	va_list args;
+	va_start(args,format);
+	uint32_t retval=vsprintf(buf,format,args);
+	va_end(args);
+	return retval;
 }

@@ -119,6 +119,6 @@ void u_prog_a(void){
 	while(1);
 }
 void u_prog_b(void){
-	printf("prog_b pid is %x\n",getpid());
+	printf("prog_b %s is %d%c","pid",getpid(),'\n');
 	while(1);
 }
