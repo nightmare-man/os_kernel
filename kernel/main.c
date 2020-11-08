@@ -64,19 +64,11 @@ int main(){
 
 	thread_start("thread1",31,func1,"t1 ");
 	thread_start("thread2",31,func2,"t2 ");
-	// process_execute(u_prog_a,"user_prog_a");
-	// process_execute(u_prog_b,"user_prog_b");
+	process_execute(u_prog_a,"user_prog_a");
+	process_execute(u_prog_b,"user_prog_b");
 	intr_enable();	//intr_enable必须在init_all之后调用，因为init_all里的初始化函数使用了put_str 这个时候不允许多线程
 
-	int* addr= sys_malloc(16);
-
-	addr[0]=1;
-	addr[1]=2;
-	addr[2]=3;
-	addr[3]=4;
-	printf("malloc addr:0x%x\n",(uint32_t)addr);
-	printf("before free %d %d %d %d\n",addr[0],addr[1],addr[2],addr[3]);
-	sys_free(addr);
+	
 	//*((int*)0xc010200c)=10;// 我惊讶的发现 即使0xc010200c对应的页表项的p位置0，仍然可以访问，可能是因为我没有写page fault中断？
 	
     while(1){
@@ -128,6 +120,15 @@ void func2(void*str){
 
 void u_prog_a(void){
 	printf("prog_a pid is %x\n",getpid());
+	int* addr= malloc(16);
+
+	addr[0]=1;
+	addr[1]=2;
+	addr[2]=3;
+	addr[3]=4;
+	printf("malloc addr:0x%x\n",(uint32_t)addr);
+	printf("before free %d %d %d %d\n",addr[0],addr[1],addr[2],addr[3]);
+	free(addr);
 	while(1);
 }
 void u_prog_b(void){

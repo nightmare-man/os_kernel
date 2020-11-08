@@ -41,14 +41,21 @@ void start_process(void* filename_){
 	proc_stack->eip=function;
 	proc_stack->cs=SELECTOR_U_CODE;
 	proc_stack->eflags=(EFLAGS_IOPL_3|EFLAGS_MBS|EFLAGS_IF_1);
+
+	//分配用户态线性地址空间的最高一页，对应的物理页是用户内存池分配的，作为栈区，栈顶指针初始为页的最高地址
 	proc_stack->esp=(void*)((uint32_t)get_a_page(PF_USER,USER_STACK3_VADDR)+PG_SIZE);
 	proc_stack->ss=SELECTOR_U_DATA;
 	asm volatile("movl %0,%%esp;jmp intr_exit"::"g"(proc_stack):"memory");//更新esp0 切换到用户进程的内核态的intr_stack
 	//从此栈pop拿到上下文 回到新进程的特权级3 代码和特权级3的栈 和数据段
 }
+
+
+//该函数在schedule时被执行，用于切换pdt
 //以下函数更新cr3,切换到用户进程的pdt，此函数必先在switch之前调用，因为switch 时已经到了用户进程的内核态了
+
 void page_dir_active(struct task_struct*p_thread){
 	//默认是内核线程
+	
 	uint32_t pagedir_phy_addr=0x100000;
 	if(p_thread->pgdir!=NULL){
 		//即是用户进程

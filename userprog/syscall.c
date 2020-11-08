@@ -4,6 +4,7 @@
 #include "../lib/kernel/print.h"
 #include "../device/console.h"
 #include "../lib/string.h"
+#include "../lib/kernel/memory.h"
 #define syscall_nr 32
 #define _syscall0(NUMBER) ({int retval;asm volatile("int $0x80":"=a"(retval):"a"(NUMBER):"memory");retval;})
 
@@ -25,6 +26,8 @@ void syscall_init(void){
 	put_str("syscall_init start\n");
 	syscall_table[SYS_GETPID]=(void*)sys_getpid;//往syscall_table里写入sys_getpid的地址
 	syscall_table[SYS_WRITE]=(void*)sys_write;
+	syscall_table[SYS_MALLOC]=(void*)sys_malloc;
+	syscall_table[SYS_FREE]=(void*)sys_free;
 	put_str("syscall_init done\n");
 }
 uint32_t getpid(void){
@@ -32,4 +35,10 @@ uint32_t getpid(void){
 }
 uint32_t write(char*str){
 	return _syscall3(SYS_WRITE,str,0,0);
+}
+void* malloc(uint32_t size){
+	return (void*)(_syscall3(SYS_MALLOC,size,0,0));
+}
+void free(void* ptr){
+	_syscall3(SYS_FREE,ptr,0,0);
 }
