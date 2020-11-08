@@ -17,7 +17,7 @@
 //并且我们还需要在内核空间里为 以后的内核线程实现 留下TCB/PCB 块的空间，也是1个页
 //最终 0x9f000 - 5*4096 =0x9a000 
 #define K_HEAP_START 0xc0100000 
-//这是堆 的起始物理地址 对应的线性地址 我们的堆从1MB以上的物理地址分配（1MB以下给内核了）
+//这是堆 的起始物理地址 对应的线性地址 我们的堆从1MB以上的物理地址分配（0xc0000000-0xc0001000以下给内核了）
 
 
 #define PDE_IDX(addr) ((addr&0xffc00000)>>22) //获取传入的线性地址的高10位page directory entry
@@ -417,4 +417,112 @@ void* sys_malloc(uint32_t size){
 		return (void*)b;
 	}
 }
+//以下函数释放物理内存池占用
+void pfree(uint32_t pg_phy_addr){
+	struct pool*mem_pool;
+	uint32_t bit_idx=0;
+	if(pg_phy_addr>=user_pool.phy_addr_start){//物理内存除了已经划归内核(2MB 1mb内核代码数据+1mb页目录页表)以外的部分 都是可分配的堆 分为两个内存池 kernel_pool
+	//和user_pool kernel_pool在前 user_pool在后
+	//此时代表该物理地址在user_pool
+		mem_pool=&user_pool;
+		
+	}else{
+		mem_pool=&kernel_pool;
+		
+	}
+	bit_idx=(pg_phy_addr-mem_pool->phy_addr_start)/PG_SIZE;
+	bitmap_set(&mem_pool->pool_bitmap,bit_idx,0);
+}
+static void page_table_pte_remove(uint32_t vaddr){
+	uint32_t* pte=pte_ptr(vaddr);
+	*pte &=~PG_P_1;//将页表项p位置0
+	asm volatile("invlpg %0"::"m"(vaddr):"memory");//更新tlb（tlb是pdt 的缓存，使用invlpg更新指定页表项的缓存）
+}
+//以下函数释放vaddr开始的n个虚拟页
+static void vaddr_remove(enum pool_flags pf,void*_vaddr,uint32_t pg_cnt){
+	uint32_t bit_idx_start=0,vaddr=(uint32_t)_vaddr,cnt=0;
+	if(pf==PF_KERNEL){
+		bit_idx_start=(vaddr-kernel_vaddr.vaddr_start)/PG_SIZE;
+		while(cnt<pg_cnt){
+			bitmap_set(&kernel_vaddr.vaddr_bitmap,bit_idx_start+cnt++,0);
+		}
+	}else{
+		struct task_struct*cur_thread=running_thread();
+		bit_idx_start=(vaddr-cur_thread->userprog_vaddr.vaddr_start)/PG_SIZE;
+		while(cnt<pg_cnt){
+			bitmap_set(&cur_thread->userprog_vaddr.vaddr_bitmap,bit_idx_start+cnt++,0);
+		}
+	}
+}
 
+//以下函数 释放虚拟地址vaddr 对应的物理页内存池 映射 和虚拟内存池
+void mfree_page(enum pool_flags pf,void* _vaddr,uint32_t pg_cnt){
+	uint32_t pg_phy_addr;
+	uint32_t vaddr=(uint32_t)_vaddr;
+	uint32_t page_cnt=0;//记录释放的物理页数目
+	ASSERT(pg_cnt>=1&&vaddr%PG_SIZE==0);//要求必须是页的起始地址
+	pg_phy_addr=addr_v2p(vaddr);
+	ASSERT((pg_phy_addr%PG_SIZE==0)&&(pg_phy_addr>=0x102000));//0x100000是内核数据代码  而0x100000-0x101000是pdt页目录表 
+	//0x101000-0x102000则是低1MB的映射页表，也不能释放
+	if(pg_phy_addr>=user_pool.phy_addr_start){
+		//位于用户物理内存池
+		while(page_cnt<pg_cnt){
+			pg_phy_addr=addr_v2p(vaddr+page_cnt*PG_SIZE);
+			ASSERT((pg_phy_addr%PG_SIZE==0)&&(pg_phy_addr>=user_pool.phy_addr_start));//确保还在用户物理内存池内（pass：作者这么写的 我觉得
+			//没必要再判断）
+			pfree(pg_phy_addr);
+			page_table_pte_remove(vaddr+page_cnt*PG_SIZE);
+			page_cnt++;
+		}
+		vaddr_remove(PF_USER,_vaddr,pg_cnt);
+	}else{
+		//位于内核内存池
+		while(page_cnt<pg_cnt){
+			pg_phy_addr=addr_v2p(vaddr+page_cnt*PG_SIZE);
+			ASSERT((pg_phy_addr%PG_SIZE==0)&&(pg_phy_addr>=kernel_pool.phy_addr_start)&&(pg_phy_addr<user_pool.phy_addr_start));
+			pfree(pg_phy_addr);
+			page_table_pte_remove(vaddr+page_cnt*PG_SIZE);
+			page_cnt++;
+		}
+		vaddr_remove(PF_KERNEL,_vaddr,pg_cnt);
+	}
+}
+
+//以下函数释放一个块的内存空间，要求传入块的起始地址（！！！如果错误地不是块的起始地址，那么会将以传入的地址为开始地址作为另一个块加入free_list，
+//这可能会破坏已经分配出去的块！！）
+void sys_free(void*ptr){
+	ASSERT(ptr!=NULL);
+	enum pool_flags PF;
+	struct pool*mem_pool;
+	if(running_thread()->pgdir==NULL){
+		//如果是内核线程
+		ASSERT((uint32_t)ptr>=K_HEAP_START);//内核可以分配的虚拟地址最小值，也就是内核的堆空间起始地址
+		PF=PF_KERNEL;
+		mem_pool=&kernel_pool;
+	}else{
+		//对于用户进程的堆的起始地址，只有装载应用程序 exec时才知道，所以这里无法做ASSERT
+		PF=PF_USER;
+		mem_pool=&user_pool;
+	}
+	lock_acquire(&mem_pool->lock);//加锁操作物理内存池（！！！没有对pfree加锁，而在调用它的sys_free处加锁！）
+	struct mem_block*b=ptr;
+	struct arena*a=block2arena(b);//获取元信息 
+	ASSERT(a->large==0||a->large==1);//主要是做完整性判断，如果不是这两个值，那么a很可能不是arena元信息
+	if(a->desc==NULL&&a->large==true){
+		mfree_page(PF,a,a->cnt);
+		//如果是大内存块，arena中块描述符为null，不在块描述符 直接 释放这些页
+	}else{
+		//小于等于1024的内存块
+		list_append(&a->desc->free_list,&b->free_elem);//直接放在对应规格的块描述符的freelist中就是释放了
+		//然后看看这个块所在的arena是不是全是空块，如果是，顺便把这个arena也释放了
+		if(++(a->cnt)==a->desc->block_per_arena){
+			uint32_t block_idx;
+			for(block_idx=0;block_idx<a->desc->block_per_arena;block_idx++){
+				b=arena2block(a,block_idx);
+				ASSERT(elem_find(&a->desc->free_list,&b->free_elem));//要arena中的每个块都在空闲链表里，就可以释放这个arena了
+			}
+			mfree_page(PF,a,1);
+		}
+	}
+	lock_release(&mem_pool->lock);//释放物理内存池的锁
+}

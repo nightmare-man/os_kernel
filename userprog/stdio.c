@@ -2,6 +2,7 @@
 #include "../lib/kernel/stdint.h"
 #include "../lib/kernel/print.h"
 #include "../lib/string.h"
+#include "../lib/user/syscall.h"
 //获取第一个参数的地址（即是v的首地址 va_list是编译器内建类型 实质是 void*）
 #define va_start(ap,v) ap=(va_list)&v
 //获取下一个参数的值（va_list类型实际是void* 每次指针+4 指向下一个参数，通过传入类型t 强制指针类型转换 再*读出值）

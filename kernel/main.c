@@ -62,15 +62,25 @@ int main(){
 
 	printf("main thread pid is %x\n",getpid());
 
-	// thread_start("thread1",31,func1,"t1 ");
-	// thread_start("thread2",31,func2,"t2 ");
+	thread_start("thread1",31,func1,"t1 ");
+	thread_start("thread2",31,func2,"t2 ");
 	// process_execute(u_prog_a,"user_prog_a");
 	// process_execute(u_prog_b,"user_prog_b");
 	intr_enable();	//intr_enable必须在init_all之后调用，因为init_all里的初始化函数使用了put_str 这个时候不允许多线程
+
+	int* addr= sys_malloc(16);
+
+	addr[0]=1;
+	addr[1]=2;
+	addr[2]=3;
+	addr[3]=4;
+	printf("malloc addr:0x%x\n",(uint32_t)addr);
+	printf("before free %d %d %d %d\n",addr[0],addr[1],addr[2],addr[3]);
+	sys_free(addr);
+	//*((int*)0xc010200c)=10;// 我惊讶的发现 即使0xc010200c对应的页表项的p位置0，仍然可以访问，可能是因为我没有写page fault中断？
 	
     while(1){
-		void* addr= sys_malloc(9);
-		printf("malloc addr:0x%x\n",(uint32_t)addr);
+		
 		//这里有必要说明下 由于线程里是while ， 不断获取锁 执行 put_str 释放锁， 因此put_str里的字符越少越好，太多了会导致 该线程被换下时大概率没有
 		//释放锁，因此其他同样使用console_put需要锁的线程即使被换上，也会立马阻塞自己，导致退化成单线程
 		//另外 千万要记得 处于多线程环境后，所有的公共资源都要加锁使用，再不能直接用put_str,会导致设置光标错位，导致访问超过viode segment的边界，造成
@@ -80,6 +90,7 @@ int main(){
 		//但是再怎么样也无法直接使用console_put函数，因为如果获取锁时阻塞了自己，那么需要调用开关中断函数，sti cli指令是cpl3时永远无法执行的
 		//经测试，userprocess cpl为0时（通过设置startprocess里的cs）是可以执行console_put的
 		//想在cpl3下执行这些操作硬件或者公共资源的想法是不好的，还是要通过系统调用，下一章即是，未完待续！！！
+	
 	}
     return 0;
 }
