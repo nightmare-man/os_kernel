@@ -19,7 +19,7 @@ extern void intr_exit(void);//定义在kernel.s里中断处理程序的返回部
 //而进程模型则是在schedule时检查时新执行流是进程还是线程。如果是进程 就准备进程的页表，并更新esp0（切换进程内核态的上下文）
 //然后还是上面那个流程 只不过kerneal_thread 传入的再是start_process 和 filename_ 作为start_process的参数
 //这个start_process会设置好intr_stack 也就是中断返回时的栈的信息，然后将esp更新到intr_stack的最底端pop拿到上下文
-//通过中断的iret返回 实现特权级的切换  （能过切换特权级的就只有 中断返回和任务返回，ret不行）,到用户代码段执行（特权级3）
+//通过中断的iret返回 实现特权级的切换（0-3）  （能过切换特权级的就只有 中断返回和任务返回，iret行 ret不行）,到用户代码段执行（特权级3）
 
 //对于线程的切换 认为ret到kernel_thread时就到了新线程了
 //对于用户进程同样是，到了kernel_thread就到了该进程的内核态
@@ -102,10 +102,11 @@ void process_execute(void* filename,char*name){
 	init_thread(thread,name,default_prio);
 	thread_create(thread,start_process,filename);//套娃 switch函数拿到新线程stack上下文ret到 thread_create会让执行流到kernel_thread并设置上下文调用start_process并传入参数filename
 	//而start_process则通过设置上下文（intr_stack） iret返回到特权级三的代码 filename为ip cs为 start_process里设置的选择子 u_code
-	//创建pdt和位图 
+	//创建pdt和位图 和初始化block_desc
 	create_user_vaddr_bitmap(thread);
 	thread->pgdir=create_page_dir();
-	
+	block_desc_init(thread->u_block_descs);
+
 	//加入队列
 	enum intr_status old_status=intr_disable();
 	ASSERT(!elem_find(&thread_ready_list,&thread->general_tag));

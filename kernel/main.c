@@ -62,14 +62,15 @@ int main(){
 
 	printf("main thread pid is %x\n",getpid());
 
-	thread_start("thread1",31,func1,"t1 ");
-	thread_start("thread2",31,func2,"t2 ");
-	process_execute(u_prog_a,"user_prog_a");
-	process_execute(u_prog_b,"user_prog_b");
+	// thread_start("thread1",31,func1,"t1 ");
+	// thread_start("thread2",31,func2,"t2 ");
+	// process_execute(u_prog_a,"user_prog_a");
+	// process_execute(u_prog_b,"user_prog_b");
 	intr_enable();	//intr_enable必须在init_all之后调用，因为init_all里的初始化函数使用了put_str 这个时候不允许多线程
 	
     while(1){
-		
+		void* addr= sys_malloc(9);
+		printf("malloc addr:0x%x\n",(uint32_t)addr);
 		//这里有必要说明下 由于线程里是while ， 不断获取锁 执行 put_str 释放锁， 因此put_str里的字符越少越好，太多了会导致 该线程被换下时大概率没有
 		//释放锁，因此其他同样使用console_put需要锁的线程即使被换上，也会立马阻塞自己，导致退化成单线程
 		//另外 千万要记得 处于多线程环境后，所有的公共资源都要加锁使用，再不能直接用put_str,会导致设置光标错位，导致访问超过viode segment的边界，造成

@@ -92,6 +92,7 @@ struct task_struct{
 		// 列表里只有elem没有 task_struct 都是通过前面定义的elem2entry反推task_struct的地址的
 	
 	uint32_t* pgdir;//执行流的页表的虚拟地址 如果为线程 该项为NULL 
+	struct mem_block_desc u_block_descs[DESC_CNT];//用户进程的block_desc表，用于满足sys_malloc分配，线程此项为NULL
 	struct virtual_addr userprog_vaddr;//虚拟内存池
 	uint32_t stack_magic;
 	// 按照栈从上往下 分布的原则 从stack_magic以上到self_kstack之间都是线程使用的栈空间

@@ -7,6 +7,7 @@
 #include "../lib/kernel/debug.h"
 #include "../thread/sync.h"
 #include "../thread/thread.h"
+#include "../lib/kernel/interrupt.h"
 //页大小
 #define MEM_BITMAP_BASE 0xc009a000 
 //将物理内存池的位图放置在0x9a000处（物理地址）
@@ -30,7 +31,15 @@ struct pool{
 	uint32_t pool_size;//位图能管理的物理位图的大小 虚拟地址pool没有这个 因为虚拟地址必定提供4GB全部的位图
 	struct lock lock;//用于互斥
 };
-struct pool kernel_pool,user_pool;
+
+struct arena{
+	struct mem_block_desc* desc;//此arena对应的mem_block_desc
+	uint32_t cnt;
+	bool large;//large为true时，是大内存块（>1024）此时desc为null cnt为arena所占页数（4096一页） 否则 desc正常，cnt为空闲的mem_block数
+};
+struct mem_block_desc k_block_descs[DESC_CNT];//块描述符表
+
+struct pool kernel_pool,user_pool;//物理内存池
 struct virtual_addr kernel_vaddr;//给内核分配虚拟地址 ，也就是针对内核的PDT(内核被单独作为一个任务 有单独的虚拟地址空间，单独的页表)
 
 
@@ -287,6 +296,16 @@ uint32_t addr_v2p(uint32_t vaddr){
 	uint32_t* pte=pte_ptr(vaddr);//这里直接去拿到这个虚拟地址对应的页表项的虚拟地址，然后访问这个地址拿到表项里的物理地址的高20位（低12位是属性）
 	return ((*pte)&0xfffff000)+(vaddr&0x00000fff);
 }
+//以下函数初始化7个描述符表
+void block_desc_init(struct mem_block_desc* desc_array){
+	uint16_t desc_idx,block_size=16;
+	for(desc_idx=0;desc_idx<DESC_CNT;desc_idx++){
+		desc_array[desc_idx].block_size=block_size;
+		desc_array[desc_idx].block_per_arena=(PG_SIZE-sizeof(struct arena))/block_size;//页里除了元信息外都用是块
+		list_init(&desc_array[desc_idx].free_list);//初始化链表
+		block_size*=2;
+	}
+}
 
 void mem_init(){
 	put_str("mem_init start\n");
@@ -296,6 +315,106 @@ void mem_init(){
 	lock_init(&user_pool.lock);
 	lock_init(&kernel_pool.lock);
 	//对两个物理内存池的锁初始化
+	block_desc_init(k_block_descs);
 	put_str("mem_init done\n");
+}
+//以下返回arena中第idx个block的起始地址
+static struct mem_block* arena2block(struct arena* a,uint32_t idx){
+	return (struct mem_block*)(  (uint32_t)a+sizeof(struct arena)+idx*(a->desc->block_size));
+}
+//以下返回某个block所属的arena地址
+static struct arena* block2arena(struct mem_block*b){
+	return (struct arena*)( (uint32_t)b & 0xfffff000);
+}
+//以下从内存池中分配字节（即是堆中分配）
+void* sys_malloc(uint32_t size){
+	enum pool_flags PF;
+	struct pool* mem_pool;
+	uint32_t pool_size;
+	struct mem_block_desc*descs;
+	struct task_struct *cur_thread=running_thread();
+	if(cur_thread->pgdir==NULL){//内核线程
+		PF=PF_KERNEL;
+		pool_size=kernel_pool.pool_size;
+		mem_pool=&kernel_pool;
+		descs=k_block_descs;
+	}else{
+		PF=PF_USER;
+		pool_size=user_pool.pool_size;
+		mem_pool=&user_pool;
+		descs=cur_thread->u_block_descs;
+	}
+	if( !(size>0&&size<pool_size) ){
+		return NULL;//超过范围
+	}
+	struct arena* a;
+	struct mem_block*b;
+	lock_acquire(&mem_pool->lock);//加锁
+	//超过1024就直接分配页
+	if(size>1024){
+		uint32_t page_cnt=DIV_ROUND_UP(size+sizeof(struct arena),PG_SIZE);
+		a=malloc_page(PF,page_cnt);
+		if(a!=NULL){
+			memset(a,0,page_cnt*PG_SIZE);
+			a->desc=NULL;//大内存 元信息里desc为NULL
+			a->cnt=page_cnt;
+			a->large=true;
+			lock_release(&mem_pool->lock);
+			return (void*)(a+1);//相当于return (void*)((uint32_t)a+sizeof(struct arena))
+		}else{
+			//malloc_page出问题
+			lock_release(&mem_pool->lock);
+			return NULL;
+		}
+	}else{//正常分配小块内存
+
+		//确定需要的size在哪一个规格
+		uint8_t desc_idx;
+		for(desc_idx=0;desc_idx<DESC_CNT;desc_idx++){
+			if(size<=descs[desc_idx].block_size){
+				break;
+			}
+		}
+		//如果该规格的块描述符的空闲链表为空
+		//那么分配新的该规格的arena 并分成块加入链表
+		if(list_empty(&descs[desc_idx].free_list)){
+			a=malloc_page(PF,1);
+			//检查分配结果
+			if(a==NULL){
+				lock_release(&mem_pool->lock);
+				return NULL;
+			}
+			memset(a,0,PG_SIZE);
+
+			a->desc=&descs[desc_idx];//将该arena指向对应规格快描述符
+			a->large=false;
+			a->cnt=descs[desc_idx].block_per_arena;//不用每次都重新计算一个页的arena能放多少个该规格的block，因为描述符表里有
+
+			uint32_t block_idx;
+
+			//将一个新arena中的所有空闲块加入描述符中的空闲表，为了防止被打断，使用中断
+			//为什么不用锁？锁是公共资源，防止互斥时才使用
+			//而且一次拿多个锁容易造成死锁
+
+			enum intr_status old_status=intr_disable();
+			for(block_idx=0;block_idx<descs[desc_idx].block_per_arena;block_idx++){
+				b=arena2block(a,block_idx);
+				ASSERT(!elem_find(&descs[desc_idx].free_list,&b->free_elem));//确保之前没被加入（一般不会 毕竟刚创建的arena中分的）
+				list_append(&descs[desc_idx].free_list,&b->free_elem);
+			}
+			intr_set_status(old_status);//关闭中断
+
+		}
+		//至此 确定descs[desc_idx].free_list非空
+		//开始分配
+		
+		//从free_list中分配一个list_elem的指针  然后用elem2entry拿到mem_block的起始地址 即使对应块地址
+		b=elem2entry(struct mem_block,free_elem,list_pop(&descs[desc_idx].free_list));
+		memset(b,0,descs[desc_idx].block_size);//理论上没必要再memset0一次 因为所有的空闲块 都是arena分来的 而arena 被memset0过
+		a=block2arena(b);
+		a->cnt--;
+		lock_release(&mem_pool->lock);
+		return (void*)b;
+	}
 }
 
