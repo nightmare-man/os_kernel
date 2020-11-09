@@ -174,3 +174,13 @@ void thread_unblock(struct task_struct*tar){
 	tar->status=TASK_READY;
 	intr_set_status(old_status);
 }
+//以下函数主动让出cpu 自己仍未ready 而不是block
+void thread_yeild(){
+	struct task_struct* cur_thread=running_thread();
+	enum intr_status old=intr_disable();//关中断 对list原子操作
+	ASSERT(!elem_find(&thread_ready_list,&cur_thread->general_tag));//确保加入之前队列里没有
+	list_append(&thread_ready_list,&cur_thread->general_tag);
+	cur_thread->status=TASK_READY;
+	schedule();
+	intr_set_status(old);
+}
