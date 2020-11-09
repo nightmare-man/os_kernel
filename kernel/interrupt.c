@@ -191,9 +191,9 @@ static void pic_init(void){
     outb(PIC_S_DATA,0x02);//告诉从片字节被链接到了主片的IR2上
     outb(PIC_S_DATA,0x01);
 
-    //只开放主片IR0 （连在时钟上，时钟中断）
-    outb(PIC_M_DATA,0xfc);//OCW1 完成ICW初始化后 对0x21/0xa1 的第一个写入即是OCW1 用于屏蔽IR 
-    outb(PIC_S_DATA,0Xff);//从片全关
+    //主片 1111 1000 0xf8（打开ir0 时钟 ir1 键盘 ir2 从片） 从片 1011 1111 0xbf(打开ir14 ata0 ata0_master和ata0_slave都在这个中断)
+    outb(PIC_M_DATA,0xf8);//OCW1 完成ICW初始化后 对0x21/0xa1 的第一个写入即是OCW1 用于屏蔽IR 
+    outb(PIC_S_DATA,0Xbf);//从片全关
     put_str("pic_init done!\n");
 }
 void idt_init(){

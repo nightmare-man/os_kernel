@@ -3,12 +3,7 @@
 #include "../lib/kernel/print.h"
 #include "../lib/string.h"
 #include "../lib/user/syscall.h"
-//获取第一个参数的地址（即是v的首地址 va_list是编译器内建类型 实质是 void*）
-#define va_start(ap,v) ap=(va_list)&v
-//获取下一个参数的值（va_list类型实际是void* 每次指针+4 指向下一个参数，通过传入类型t 强制指针类型转换 再*读出值）
-#define va_arg(ap,t) *((t*)(ap+=4))
-//将指针置0
-#define va_end(ap) ap=NULL
+
 
 //整数转字符串 buf_ptr_addr 是缓冲区的当前位置的指针的指针，用二级指针的原因是，使用了递归，递归过程中要修改递归外面的指针值，因此用
 //指针的指针作为参数二 base是进制
