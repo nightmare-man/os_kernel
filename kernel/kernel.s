@@ -130,3 +130,72 @@ mov [esp+8*4],eax;将syscall_table返回值eax 写入到栈里eax的地方（eax
 jmp intr_exit
 section .data
 dd syscall_handler
+
+;临时的读磁盘函数，后面会有专门的磁盘管理
+[bits 32]
+section .text
+global sys_read_disk
+;sys_read_disk(uint32_t lba,void* addr,uint32_t cnt);
+;栈 cnt addr lba eip ecx ds esi edi 
+sys_read_disk:; 保护模式下的32位读磁盘 eax LBA扇区号 ds:esi 读入内存的地址 ecx 读入的扇区数
+    push ecx
+    push ds
+    push esi
+    push edi
+	mov eax,[esp+4*5]
+	mov ecx,[esp+4*7]
+	mov esi,[esp+4*6]
+    mov ebp,eax;//使用32位寄存器
+    mov edi,ecx;//对eax cx备份
+
+    mov dx,0x1f2
+    mov al,cl
+    out dx,al;写入数据
+
+    mov eax,ebp
+
+    mov dx,0x1f3;从 eax写入0-27位地址到对应端口
+    out dx,al
+
+    mov cl,8
+    shr eax,cl
+    mov dx,0x1f4
+    out dx,al
+
+    shr eax,cl
+    mov dx,0x1f5
+    out dx,al
+
+    shr eax,cl
+    and al,0x0f
+    or al,0xe0;将4-7位设置成0xe0 使用lba模式
+    mov dx,0x1f6
+    out dx,al
+
+    mov dx,0x1f7
+    mov al,0x20
+    out dx,al;读命令
+
+.not_ready:;阻塞式读取
+    nop
+    in al,dx;0x1f7既用来写命令 又用来查询命令后的状态
+    and al,0x88
+    cmp al,0x08;如果第3位为1 就准备就绪了 并不需要第7位也为1
+    jnz .not_ready;不是0x88就循环等
+
+    mov eax,edi
+    mov edx,256
+    mul edx
+    mov ecx,eax;//16位*16位 结果 dx：ax ax是低16位 保存着需要读取的次数
+    ;一个扇区512字节 需要读 256次（1次16位）
+    mov dx,0x1f0
+.go_on_read:
+    in ax,dx;这里是x一次读16位，16位的端口而不是8位
+    mov [ds:esi],ax
+    add esi,2
+    loop .go_on_read
+    pop edi
+    pop esi
+    pop ds
+    pop ecx
+    ret

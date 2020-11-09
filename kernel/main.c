@@ -48,9 +48,28 @@ void func1(void*str);
 void func2(void*str);
 void u_prog_a();
 void u_prog_b();
-
-
-
+struct dpt_entry{
+	uint8_t active;
+	uint8_t start_header;
+	uint8_t start_sector;
+	uint8_t start_cylinder;
+	uint8_t file_system;
+	uint8_t end_header;
+	uint8_t end_sector;
+	uint8_t end_cylinder;
+	uint32_t start_offset_sector;
+	uint32_t sector_count;
+};
+struct dpt{
+	struct dpt_entry entrys[4];
+};
+#pragma pack(1)
+struct mbr{
+	char code[446];
+	struct dpt PDT;
+	uint16_t magic_number;
+};
+#pragma pack(4)
 
 int main(){
 	
@@ -133,5 +152,13 @@ void u_prog_a(void){
 }
 void u_prog_b(void){
 	printf("prog_b %s is %d%c","pid",getpid(),'\n');
+	struct mbr MBR;
+	printf("MBR addr is 0x%x\nsizeof MBR is %d\n",&MBR,sizeof(struct mbr));
+	memset(&MBR,0,512);
+	read_disk(0,&MBR,1);
+	uint32_t i;
+	for(i=0;i<128;i++){
+		printf("0x%x ",*(((uint32_t*)(&MBR))+i));
+	}
 	while(1);
 }
