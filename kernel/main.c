@@ -104,6 +104,7 @@ int main(){
 		//想在cpl3下执行这些操作硬件或者公共资源的想法是不好的，还是要通过系统调用，下一章即是，未完待续！！！
 		printfk("this is main thread\n");
 		thread_block(TASK_BLOCKED);//干掉全部线程， idle线程接管cpu
+		//block和yeild的区别 前者只能等好心人unblock 后者还会被轮换到
 	}
     return 0;
 }
