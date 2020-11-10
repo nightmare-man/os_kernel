@@ -8,6 +8,7 @@
 #include "../lib/kernel/list.h"
 #include "../lib/kernel/print.h"
 #include "../lib/user/process.h"
+#include "../lib/kernel/stdio_kernel.h"
 struct task_struct*main_thread;//主线程tcb thread control block
 struct list thread_ready_list;//就绪队列
 struct list thread_all_list;//全部线程队列
@@ -16,10 +17,12 @@ struct lock pid_lock;//用来保存pid已经分配到哪里的锁
 extern void switch_to(struct task_struct*cur,struct task_struct*next);//用汇编写的 switch_to函数 用来切换线程
 static uint32_t next_pid=0;//静态局部变量 保存在全局区 而不是栈
 
+struct task_struct* idle_thread;//idle线程
 //下面函数获取当前正在运行的线程，原理是线程运行时esp会在其 task_struct 也就是tcb中 tcb大小为0x1000 对esp取整就是
 struct task_struct* running_thread(){
 	uint32_t esp;
-	asm volatile("movl %%esp,%0":"=g"(esp));
+	asm volatile("movl %%esp,%0":"=g"(esp));//内联汇编是AT&T语法 源在左
+	//printfk("esp 0x%x\n",esp);
 	return (struct task_struct*)(esp&0xfffff000);
 }
 static pid_t allocate_pid(void){
@@ -113,9 +116,7 @@ void schedule(){
 	
 	ASSERT(intr_get_status()==INTR_OFF);//调度时必须关中断
 	//目前schedule只在时钟中断中被调用 因此不会再被中断 可以保证
-	struct task_struct*cur=running_thread();
-	
-	
+	struct task_struct*cur=running_thread();	
 	if(cur->status==TASK_RUNNING){
 		//表示是由于时间片用完了 换下 直接放到ready队列末尾
 		ASSERT(!elem_find(&thread_ready_list,&cur->general_tag));//确保之前不在就绪队列
@@ -125,8 +126,11 @@ void schedule(){
 		
 	}else{
 		//由于blocked等因素被换下 暂时不考虑
-		
+		//由于调用yeild，也会来到这里，因为yeild先把task_status 变成ready了，但是没有重新装填时间片
 		//while(1);
+	}
+	if(list_empty(&thread_ready_list)){
+		thread_unblock(idle_thread);
 	}
 	ASSERT(!list_empty(&thread_ready_list));//就绪链表不空 不然没法执行了
 	thread_tag=NULL;//临时变量
@@ -135,10 +139,18 @@ void schedule(){
 	next->status=TASK_RUNNING;
 	process_active(next);
 	
-	
+	printfk("cur is 0x%x,next is 0x%x\n",cur,next);
 	
 	switch_to(cur,next);//调用切换函数 这个函数用汇编写的
 
+}
+static void idle(void*arg_unused){
+	while(1){
+		printfk("this is idle thread\n");
+		thread_block(TASK_BLOCKED);//先阻塞自己，看看有没有其他线程可以切换
+		
+		asm volatile("sti;hlt;":::"memory");//如果没有就 开中断，hlt（中断能从hlt唤醒）
+	}
 }
 void thread_init(void){
 	
@@ -146,8 +158,11 @@ void thread_init(void){
 	list_init(&thread_all_list);//对两个链表进行初始化
 	list_init(&thread_ready_list);
 	lock_init(&pid_lock);
-	ASSERT(list_empty(&thread_ready_list)==true);
+	ASSERT(list_empty(&thread_ready_list));
 	make_main_thread();//给主线程 初始化tcb和加入队列
+	//初始化idle线程
+	idle_thread=thread_start("idle",10,idle,NULL);
+
 	put_str("thread_init done\n");
 }
 
@@ -174,13 +189,15 @@ void thread_unblock(struct task_struct*tar){
 	tar->status=TASK_READY;
 	intr_set_status(old_status);
 }
-//以下函数主动让出cpu 自己仍未ready 而不是block
+//以下函数主动让出cpu 自己变成是ready 而不是block
 void thread_yeild(){
 	struct task_struct* cur_thread=running_thread();
 	enum intr_status old=intr_disable();//关中断 对list原子操作
 	ASSERT(!elem_find(&thread_ready_list,&cur_thread->general_tag));//确保加入之前队列里没有
 	list_append(&thread_ready_list,&cur_thread->general_tag);
-	cur_thread->status=TASK_READY;
+	cur_thread->status=TASK_READY;//直接变ready 不重新装填时间片
 	schedule();
 	intr_set_status(old);
 }
+//以下为系统空闲时运行的线程，进入hlt状态（处理器暂停，而不是loop空转）
+

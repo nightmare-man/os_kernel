@@ -64,7 +64,7 @@ struct dpt_entry{
 struct dpt{
 	struct dpt_entry entrys[4];
 };
-#pragma pack(1)
+#pragma pack(1)//对齐方式修改为1字节
 struct mbr{
 	char code[446];
 	struct dpt PDT;
@@ -82,13 +82,13 @@ int main(){
 
 	printfk("main thread pid is %x\n",getpid());
 
-	thread_start("thread1",31,func1,"t1 ");
-	thread_start("thread2",31,func2,"t2 ");
-	process_execute(u_prog_a,"user_prog_a");
-	process_execute(u_prog_b,"user_prog_b");
+	//thread_start("thread1",31,func1,"t1 ");
+	//thread_start("thread2",31,func2,"t2 ");
+	// process_execute(u_prog_a,"user_prog_a");
+	// process_execute(u_prog_b,"user_prog_b");
 	intr_enable();	//intr_enable必须在init_all之后调用，因为init_all里的初始化函数使用了put_str 这个时候不允许多线程
 
-	
+	//thread_yeild();
 	//*((int*)0xc010200c)=10;// 我惊讶的发现 即使0xc010200c对应的页表项的p位置0，仍然可以访问，可能是因为我没有写page fault中断？
 	
     while(1){
@@ -102,7 +102,8 @@ int main(){
 		//但是再怎么样也无法直接使用console_put函数，因为如果获取锁时阻塞了自己，那么需要调用开关中断函数，sti cli指令是cpl3时永远无法执行的
 		//经测试，userprocess cpl为0时（通过设置startprocess里的cs）是可以执行console_put的
 		//想在cpl3下执行这些操作硬件或者公共资源的想法是不好的，还是要通过系统调用，下一章即是，未完待续！！！
-	
+		printfk("this is main thread\n");
+		thread_block(TASK_BLOCKED);//干掉全部线程， idle线程接管cpu
 	}
     return 0;
 }

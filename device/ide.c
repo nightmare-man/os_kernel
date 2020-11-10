@@ -1,9 +1,5 @@
 #include "./ide.h"
-#include "../lib/kernel/bitmap.h"
-#include "../lib/kernel/list.h"
-#include "../thread/sync.h"
-#include "../lib/kernel/stdio_kernel.h"
-#include "../lib/user/stdio.h"
+
 #define reg_data(channel) (channel->port_base+0)
 #define reg_error(channel) (channel->port_base+1)
 #define reg_sect_cnt(channel) (channel->port_base+2)
@@ -38,7 +34,7 @@ uint8_t channel_cnt;//记录通道数 （硬盘数/2） 实际上最多就两个
 struct ide_channel channels[2];
 void ide_init(){
 	printfk("ide_init start\n");
-	uint8_t hd_cnt= *((void*)hd_cnt_addr);
+	uint8_t hd_cnt= *((uint8_t*)hd_cnt_addr);
 	ASSERT(hd_cnt>0);
 	channel_cnt=DIV_ROUND_UP(hd_cnt,2);
 	struct ide_channel* channel;
@@ -57,7 +53,7 @@ void ide_init(){
 				break;
 		}
 		channel->expecting_intr=false;
-		lock_init(channel->lock);
+		lock_init(&channel->lock);
 		sema_init(&channel->disk_done,0);
 		channel_no++;
 	}

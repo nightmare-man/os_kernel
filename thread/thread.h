@@ -108,4 +108,5 @@ void schedule();
 void thread_block(enum task_status stat);
 void thread_unblock(struct task_struct*tar);
 struct task_struct* running_thread();
+void thread_yeild();
 #endif
