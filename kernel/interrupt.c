@@ -26,7 +26,7 @@
 #define PIC_S_CTRL 0xa0 //从片 控制端口
 #define PIC_S_DATA 0xa1 //从片数据端口
 extern struct tss tss;
-uint32_t ticks;// 系统启动以来的总ticks
+
 
 
 //以下是中断门描述符格式 共8字节
@@ -78,24 +78,7 @@ static void general_intr_handler(uint8_t vec_nr){
 	while(1);//有中断直接死循环了 ；由于进入中断处理器自动将if置0 因此可屏蔽中断关了 出不去了
 }
 
-static void intr_timer_handler(void){
-	struct task_struct* cur_thread=running_thread();
-	ASSERT(cur_thread->stack_magic==0x19980114);//对边缘进行检测 如果magic number不对 说明栈溢出修改了
 
-	//ticks相关
-	ticks++;
-	cur_thread->elapsed_ticks++;
-	if(cur_thread->ticks==0){
-		//时间片用完 调度新的
-		//处理器进入中断 push eflags cs ip 并if tf =0关闭中断了
-		//所以能保证调度器是原子操作
-		schedule();//schedule 是调度函数
-
-	}else{
-		cur_thread->ticks--;
-		//不然的话thread ticks减1
-	}
-}
 
 //------------------------------以下是时钟中断设置
 
@@ -105,13 +88,6 @@ void register_handler(uint8_t vector,intr_handler function){
 	//改idt_table
 }
 
-void timer_init(){
-	put_str("timer_init start\n");
-	//以下宏都定义在timer.h 可以通过修改IRQ0_FREQUENCY修改频率
-	frequency_set(COUNTER0_PORT,COUNTER0_NO,READ_WRITE_LATCH,COUNTER0_MODE,COUNTER0_VALUE);
-	register_handler(0x20,intr_timer_handler);
-	put_str("timer_init done\n");
-}
 
 
 //-------------------------------以下是一般中断设置
