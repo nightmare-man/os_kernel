@@ -38,6 +38,5 @@ struct ide_channel{
 	struct semaphore disk_done;
 	struct disk devices[2];//一个通道上两个磁盘 一主一从
 };
-
-
+void ide_init();
 #endif

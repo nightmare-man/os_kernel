@@ -62,6 +62,6 @@ static void ticks_to_sleep(uint32_t sleep_ticks){
 }
 void milliseconds_sleep(uint32_t mil_secs){
 	uint32_t ticks_sleep=DIV_ROUND_UP(mil_secs,mil_secs_per_ticks);
-	ASSERT(ticks_sleep>);
+	ASSERT(ticks_sleep>0);
 	ticks_to_sleep(ticks_sleep);
 }
