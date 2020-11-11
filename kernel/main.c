@@ -21,6 +21,7 @@
 #include "../lib/user/syscall.h"
 #include "../lib/user/stdio.h"
 #include "../lib/kernel/stdio_kernel.h"
+#include "../device/ide.h"
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -72,12 +73,22 @@ struct mbr{
 };
 #pragma pack(4)
 
+extern struct ide_channel channels[2];
+
 int main(){
 	
 	init_all();
-	
-	
-
+	struct mbr MBR;
+	struct disk hd;
+	hd.dev_no=0;
+	hd.my_channel=&channels[0];
+	sprintf(hd.name,"sda");
+	ide_read(&hd,0,&MBR,1);
+	uint32_t i;
+	for(i=0;i<128;i++){
+		printfk("0x%x ",*( (int*)(&MBR) +i ));
+	}
+	while(1);
 
 
 	printfk("main thread pid is %x\n",getpid());
@@ -103,7 +114,9 @@ int main(){
 		//经测试，userprocess cpl为0时（通过设置startprocess里的cs）是可以执行console_put的
 		//想在cpl3下执行这些操作硬件或者公共资源的想法是不好的，还是要通过系统调用，下一章即是，未完待续！！！
 		printfk("this is main thread\n");
-		thread_block(TASK_BLOCKED);//干掉全部线程， idle线程接管cpu
+		
+		
+		//thread_block(TASK_BLOCKED);//干掉全部线程， idle线程接管cpu
 		//block和yeild的区别 前者只能等好心人unblock 后者还会被轮换到
 	}
     return 0;

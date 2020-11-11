@@ -203,6 +203,7 @@ void ide_init(){
 	uint8_t hd_cnt= *((uint8_t*)hd_cnt_addr);
 	ASSERT(hd_cnt>0);
 	channel_cnt=DIV_ROUND_UP(hd_cnt,2);
+	printfk("channel_cnt:%d\n",channel_cnt);
 	struct ide_channel* channel;
 	uint8_t channel_no=0;
 	while(channel_no<channel_cnt){

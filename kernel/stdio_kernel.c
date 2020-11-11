@@ -1,5 +1,7 @@
 #include "../lib/user/stdio.h"
 #include "../device/console.h"
+
+
 void printfk(const char*format,...){
 	va_list args;
 	va_start(args,format);//根据第一个参数的位置，取得参数列表的位置

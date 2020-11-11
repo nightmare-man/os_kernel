@@ -19,4 +19,4 @@ def get_file_path(root_path,tar_str):
                     print(dir_file_path)
             except:
                 print("")
-get_file_path("/home/lsm/os_kernel/","volatile")
+get_file_path("/home/lsm/os_kernel/","printfk")

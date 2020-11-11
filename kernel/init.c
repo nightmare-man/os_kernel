@@ -8,6 +8,7 @@
 #include "../device/keyboard.h"
 #include "../lib/user/tss.h"
 #include "../lib/user/syscall.h"
+#include "../device/ide.h"
 void init_all(){
     put_str("  init  all\n");
     idt_init();
@@ -18,4 +19,5 @@ void init_all(){
 	keyboard_init();
 	tss_init();
 	syscall_init();
+	ide_init();
 }

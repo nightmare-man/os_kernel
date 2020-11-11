@@ -14,6 +14,12 @@ void lock_init(struct lock*plock){
 void sema_down(struct semaphore*psema){
 	//信号量本身也是一种公共资源 访问必须要原子操作
 	enum intr_status old_status=intr_disable();
+	// put_str("this thread is:0x");
+	// put_int((uint32_t)running_thread());
+	// put_char('\n');
+	// put_str("this thread status is:0x");
+	// put_int((uint32_t)running_thread()->status);
+	// put_char('\n');
 	while(psema->value==0){//为什么用while而不是if？ 因为 可能第一判断不行  然后阻塞 回来后还应该判断 所以用while判断
 		ASSERT(!elem_find(&psema->waiters,&running_thread()->general_tag));//当前进程不应该在等待队列
 		//（等待队列里状态都是block等）

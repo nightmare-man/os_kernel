@@ -114,7 +114,7 @@ static void make_main_thread(void){
 //以下为调度函数
 void schedule(){
 	
-	ASSERT(intr_get_status()==INTR_OFF);//调度时必须关中断
+	ASSERT(intr_get_status()==INTR_OFF);//调度时必须关中断  在thread_kernel后开中断
 	//目前schedule只在时钟中断中被调用 因此不会再被中断 可以保证
 	struct task_struct*cur=running_thread();	
 	if(cur->status==TASK_RUNNING){
@@ -139,14 +139,21 @@ void schedule(){
 	next->status=TASK_RUNNING;
 	process_active(next);
 	
-	printfk("cur is 0x%x,next is 0x%x\n",cur,next);
+	
+	//printfk("error\n");  在这里写printfk 很危险，因为在这儿还是属于原线程，但是它的status已经改变了，不是TASK_RUNNING
+	//如果因为 printfk再次被阻塞再次进入schedule 就出问题了，另外 如果是因为printfk拿不到锁被阻塞导致的调度执行到这里，
+	//那么再次执行printfk获取锁就会出问题
+	
 	
 	switch_to(cur,next);//调用切换函数 这个函数用汇编写的
 
 }
+
+//此函数为idle_thread线程函数 idle中不能执行加锁 因为加锁后
+//比如
 static void idle(void*arg_unused){
 	while(1){
-		printfk("this is idle thread\n");
+		printfk("this is idle thread\n"); 
 		thread_block(TASK_BLOCKED);//先阻塞自己，看看有没有其他线程可以切换
 		
 		asm volatile("sti;hlt;":::"memory");//如果没有就 开中断，hlt（中断能从hlt唤醒）

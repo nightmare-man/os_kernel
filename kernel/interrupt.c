@@ -14,7 +14,8 @@
 #include "../lib/kernel/debug.h"
 #include "../lib/user/tss.h"
 //#include "global.h"
-#define IDT_DESC_CNT 0x81 //目前支持的中断数 0-0x80 0x80为syscall 中断
+#define IDT_DESC_CNT 0x31 //目前支持的中断数 0-0x80 0x80为syscall 中断
+#define IDT_DESC_CNT_MAX 0x81 //中断号的数量（最后一个是0x80 第一个是0x00 因此idt的数量是0x81）
 //2020-9-20 加入idt中键盘中断
 #define EFLAGS_IF 0x00000200 //IF位为1
 #define GET_EFLAGS(EFLAG_VAR) asm volatile("pushfl;popl %0":"=g"(EFLAG_VAR))
@@ -37,7 +38,7 @@ struct gate_desc{
     uint8_t attribute;//属性8位
     uint16_t func_offset_high_word;//中断处理程序偏移地址高16位
 };
-static struct gate_desc idt[IDT_DESC_CNT];//static的本质是在符号表（symbol tabl）里为local，链接时不能被其他模块引用
+static struct gate_desc idt[IDT_DESC_CNT_MAX];//static的本质是在符号表（symbol tabl）里为local，链接时不能被其他模块引用
 
 
 char* intr_name[IDT_DESC_CNT];//对每个中断做一个说明
@@ -138,13 +139,11 @@ static void make_idt_desc(struct gate_desc* p_gdesc,uint8_t attr,intr_handler fu
 }
 static void idt_desc_init(void){
     int i;
-	int lastindex=(IDT_DESC_CNT-1);//0X80 SYS_CALL
-    for(i=0;i<0x22;i++){
+    for(i=0;i<IDT_DESC_CNT-1;i++){//安装前面连续的30个描述符
         make_idt_desc(&idt[i],IDT_DESC_ATTR_DPL0,intr_entry_table[i]);
     }
-	put_int((uint32_t)intr_entry_table[0x22]);
-	put_char('\n');
-	make_idt_desc(&idt[lastindex],IDT_DESC_ATTR_DPL3,intr_entry_table[0x22]);
+	//单独安装syscall 中断号0x80的描述符
+	make_idt_desc(&idt[0x80],IDT_DESC_ATTR_DPL3,intr_entry_table[0x30]);
 	//硬件中断不检查特权级，因此idt_desc的dpl怎么设置都行
 	//但是软中断（int调用的） 要检查dpl 因此设置为3 
 	//但是目标代码段仍然是内核代码段 特权级为0，中断和调用门均可从特权级3转移到0 （依从代码可执行 但是特权级不变）
