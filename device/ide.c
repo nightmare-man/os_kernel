@@ -2,6 +2,8 @@
 #include "../lib/kernel/io.h"
 #include "../lib/kernel/timer.h"
 #include "../lib/kernel/interrupt.h"
+#include "../lib/kernel/memory.h"
+#include "../lib/string.h"
 //以下是ide（integrated dirver electronics 集成电子设备）寄存器 详情可见 第三章
 #define reg_data(channel) (channel->port_base+0)
 #define reg_error(channel) (channel->port_base+1)
@@ -37,6 +39,32 @@ uint8_t channel_cnt;//记录通道数 （硬盘数/2） 实际上最多就两个
 
 
 struct ide_channel channels[2];
+
+uint32_t ext_part_lba_base =0;//扩展分区的起始扇区
+uint8_t p_no=0,l_no=0;//记录硬盘主分区和逻辑分区下标
+struct list partition_list;//分区链表
+
+struct partition_table_entry{//dpt项结构
+	uint8_t bootable;
+	uint8_t start_head;
+	uint8_t start_sec;
+	uint8_t start_chs;//起始柱面号
+	uint8_t fs_type;
+	uint8_t end_head;
+	uint8_t end_sec;
+	uint8_t end_chs;
+	//下面两项重要
+	uint32_t start_lba;
+	uint32_t sec_cnt;
+} __attribute__((packed));//关闭内存对齐，按照16字节编译
+
+struct boot_sector{//mbr扇区结构
+	uint8_t text[446];//代码
+	struct partition_table_entry dpt[4];//dpt
+	uint16_t signature; //0x55 0xaa 结束标志
+} __attribute__((packed));
+
+
 
 
 //以下函数切换工作硬盘 主/从
@@ -185,6 +213,7 @@ void ide_write(struct disk*hd,uint32_t lba,void*buf,uint32_t sec_cnt){
 	lock_release(&hd->my_channel->lock);//释放通道
 }
 void intr_hd_handler(uint8_t irq_no){
+	
 	ASSERT(irq_no==(0x2e)||irq_no==(0x2f));// irq14 15中断码
 	uint8_t ch_no=irq_no-0x2e;
 	struct ide_channel* channel=&channels[ch_no];
@@ -196,16 +225,119 @@ void intr_hd_handler(uint8_t irq_no){
 		//读status 让硬盘知道此中断已经被处理 继续操作
 		inb(reg_status(channel));
 	}
+	
 }
+
+//此函数交换一个字符串里相邻两个字节的位置
+static void swap_pairs_bytes(const char*dst,char*buf,uint32_t len){
+	uint8_t idx;
+	for(idx=0;idx<len;idx+=2){
+		buf[idx+1]=*dst++;//idx+1可能会越界，要求 len为偶数才行
+		buf[idx]=*dst++;
+	}
+	buf[idx]='\0';
+}
+
+//to-fix
+//2020-11-11：invalid opcode exception 
+//推测为 缓冲区溢出导致此函数ret错误位置！（因为调用此函数前可以printfk，此函数最后一句也能正常执行，但是返回就错误）
+//另外printfk过buf变量 ，我觉得应该给sprintf加一个防止缓冲区溢出检测！！！
+
+static void identify_disk(struct disk*hd){
+	char id_info[512];//保存identify返回的512字节数据
+	select_disk(hd);
+	
+	cmd_out(hd->my_channel,CMD_IDENTIFY);
+	//相当于读数据，因此发送命令后立马阻塞自己 不用yeild是因为yeild后大概率还是没完成，因此等中断unblock比较合适
+	sema_down(&hd->my_channel->disk_done);
+	
+	if(!busy_wait(hd)){
+		char error[512];
+		
+		sprintf(error,"%s identify failed!\n",hd->name);
+		
+		PANIC(error);
+	}
+	read_from_sector(hd,id_info,1);
+	char buf[64];
+	uint8_t sn_start=10*2,sn_len=20,md_start=27*2,md_len=40;
+	swap_pairs_bytes(&id_info[sn_start],buf,sn_len);
+	printfk("   SN: %s\n",buf);
+	memset(buf,0,sizeof(buf));
+	swap_pairs_bytes(&id_info[md_start],buf,md_len);
+	printfk("  MODULE: %s\n",buf);
+	uint32_t sectors=*(uint32_t*)&id_info[60*2];
+	printfk("  SECTORS: %d\n",sectors);
+	printfk("  CAPACITY: %dMB\n",sectors*512/1024/1024);
+	printfk("%s",buf);
+}
+
+//以下函数递归的扫描分区信息， 传入hd ext_lba(mbr/ebr所在扇区lba)
+static void partition_scan(struct disk* hd,uint32_t ext_lba){
+	struct boot_sector *bs=sys_malloc(sizeof(struct boot_sector));//我们的栈（内核线程的 都在pcb里 和其他结构一起不能超过4096不然溢出）
+	//况且这个partition_scan还是递归调用的 因此得malloc
+	ide_read(hd,ext_lba,bs,1);//读入mbr/ebr
+	uint8_t part_idx=0;
+	struct partition_table_entry*p=bs->dpt;
+	while(part_idx<4){
+		if(p[part_idx].fs_type==0x05){
+			//是扩展分区
+			if(ext_part_lba_base==0){
+				//即第一次scan 这个扩展分区是主扩展分区
+				ext_part_lba_base=p[part_idx].start_lba;//更新扩展分区偏移地址
+				partition_scan(hd,p[part_idx].start_lba);//递归
+			}else{
+				partition_scan(hd,p[part_idx].start_lba+ext_part_lba_base);//那么这是扩展分区链，指向下一个扩展分区
+			}
+
+		}else if(p[part_idx].fs_type!=0){
+			//有效分区类型
+			if(ext_lba==0){
+				ASSERT(p_no<4);
+				//此时是mbr记录的主分区
+				hd->prim_parts[p_no].start_lba=ext_lba+p[part_idx].start_lba;//真的离谱，ext_lba都为0了 还搁这儿+
+				hd->prim_parts[p_no].sec_cnt=p[part_idx].sec_cnt;
+				hd->prim_parts[p_no].belong_to=hd;
+				list_append(&partition_list,&hd->prim_parts[p_no].part_tag);//加入分区链表;
+				sprintf(hd->prim_parts[p_no].name,"%s%d",hd->name,p_no+1);
+				p_no++;
+				
+			}else{
+				if(l_no>7){
+					return;//只支持8个逻辑分区
+				}
+				//逻辑分区
+				hd->logic_parts[l_no].start_lba=ext_lba+p[part_idx].start_lba;//真的离谱，ext_lba都为0了 还搁这儿+
+				hd->logic_parts[l_no].sec_cnt=p[part_idx].sec_cnt;
+				hd->logic_parts[l_no].belong_to=hd;
+				list_append(&partition_list,&hd->logic_parts[l_no].part_tag);
+				sprintf(hd->logic_parts[l_no].name,"%s%d",hd->name,l_no+5);// 逻辑分区标号从5开始
+				l_no++;
+			}
+		}
+		part_idx++;
+	}
+	sys_free(bs);//释放保存mbr ebr的内存，分区都在hd->logic_parts 和hd->prim_parts链里
+}
+static bool partition_info(struct list_elem*pelem,int arg_UNUSED){
+	struct partition*part=elem2entry(struct partition,part_tag,pelem);
+	printfk("   %s start_lba:0x%x, sec_cnt:0x%x\n",part->name,part->start_lba,part->sec_cnt);
+	return false;
+}
+
+
 //初始化ide
 void ide_init(){
 	printfk("ide_init start\n");
 	uint8_t hd_cnt= *((uint8_t*)hd_cnt_addr);
 	ASSERT(hd_cnt>0);
 	channel_cnt=DIV_ROUND_UP(hd_cnt,2);
-	printfk("channel_cnt:%d\n",channel_cnt);
+	//printfk("channel_cnt:%d\n",channel_cnt);
 	struct ide_channel* channel;
 	uint8_t channel_no=0;
+	uint8_t dev_no=0;
+
+	//初始化通道channels
 	while(channel_no<channel_cnt){
 		channel=&channels[channel_no];
 		sprintf(channel->name,"ide%d",channel_no);
@@ -225,8 +357,32 @@ void ide_init(){
 
 		//注册irq14 15 handler
 		register_handler(channel->irq_no,intr_hd_handler);
+		
+		//初始化磁盘channel->devces
 
+		while(dev_no<2){
+			struct disk*hd=&channel->devices[dev_no];
+			hd->my_channel=channel;
+			hd->dev_no=dev_no;
+			
+			sprintf(hd->name,"sd%c",'a'+channel_no*2+dev_no);//设置默认磁盘名
+			printfk("111\n");
+			identify_disk(hd);
+			printfk("222\n");
+			if(dev_no!=0){//只扫描第二个磁盘，因为我们第一个磁盘没分区
+				partition_scan(hd,0);//
+			}
+			p_no=0;
+			l_no=0;
+			
+			dev_no++;
+		}
+		
+		dev_no=0; //这些置0是为了再次对某个硬盘使用partition_scan，实际上我们只对一个硬盘使用，因此用不上
 		channel_no++;
 	}
+	printfk("\n   all partition info\n");
+	list_traversal(&partition_list,partition_info,(int)NULL);
 	printfk("ide_init done\n");
 }
+

@@ -153,7 +153,7 @@ void schedule(){
 //比如
 static void idle(void*arg_unused){
 	while(1){
-		printfk("this is idle thread\n"); 
+		//printfk("this is idle thread\n"); 
 		thread_block(TASK_BLOCKED);//先阻塞自己，看看有没有其他线程可以切换
 		
 		asm volatile("sti;hlt;":::"memory");//如果没有就 开中断，hlt（中断能从hlt唤醒）
@@ -186,7 +186,7 @@ void thread_block(enum task_status stat){
 	intr_set_status(old_status);
 }
 
-//以下函数解除阻塞线程tar ，
+//以下函数解除阻塞线程tar
 void thread_unblock(struct task_struct*tar){
 	enum intr_status old_status=intr_disable();
 	ASSERT((tar->status==TASK_BLOCKED)||(tar->status==TASK_HANGING)||(tar->status==TASK_WAITING));
