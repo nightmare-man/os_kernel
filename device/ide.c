@@ -1,6 +1,7 @@
 #include "./ide.h"
 #include "../lib/kernel/io.h"
 #include "../lib/kernel/timer.h"
+#include "../lib/kernel/interrupt.h"
 //以下是ide（integrated dirver electronics 集成电子设备）寄存器 详情可见 第三章
 #define reg_data(channel) (channel->port_base+0)
 #define reg_error(channel) (channel->port_base+1)
@@ -30,39 +31,12 @@
 #define CMD_READ_SECTOR 0x20
 #define CMD_WRITE_SECTOR 0x30 //读写硬盘
 
-#define max_lba ((80*1024*1024/512)-1)
+#define max_lba ((80*1024*1024/512)-1) //从0开始计数 因此-1
 #define hd_cnt_addr 0x475 //bios记录hd_cnt的地址
 uint8_t channel_cnt;//记录通道数 （硬盘数/2） 实际上最多就两个primary channel 和 secondary channel
 
 
 struct ide_channel channels[2];
-void ide_init(){
-	printfk("ide_init start\n");
-	uint8_t hd_cnt= *((uint8_t*)hd_cnt_addr);
-	ASSERT(hd_cnt>0);
-	channel_cnt=DIV_ROUND_UP(hd_cnt,2);
-	struct ide_channel* channel;
-	uint8_t channel_no=0;
-	while(channel_no<channel_cnt){
-		channel=&channels[channel_no];
-		sprintf(channel->name,"ide%d",channel_no);
-		switch(channel_no){
-			case 0:
-				channel->port_base=0x1f0;
-				channel->irq_no=0x20+14;//在从片的irq14
-				break;
-			case 1:
-				channel->port_base=0x170;
-				channel->irq_no=0x20+15;
-				break;
-		}
-		channel->expecting_intr=false;
-		lock_init(&channel->lock);
-		sema_init(&channel->disk_done,0);
-		channel_no++;
-	}
-	printfk("ide_init done\n");
-}
 
 
 //以下函数切换工作硬盘 主/从
@@ -74,7 +48,7 @@ static void select_disk(struct disk*hd){
 }
 
 static void select_sector(struct disk*hd,uint32_t lba,uint8_t sec_cnt){
-	ASSERT(lba<max_lba);
+	ASSERT(lba<=max_lba);
 	struct ide_channel*channel=hd->my_channel;
 	outb(reg_sect_cnt(channel),sec_cnt);//写入要操作的扇区数
 
@@ -129,4 +103,129 @@ static bool busy_wait(struct disk*hd){
 		}
 	}
 	return false;//如果30s过去没drq置1 那就timeout
+}
+void ide_read(struct disk*hd,uint32_t lba,void*buf,uint32_t sec_cnt){
+	ASSERT(lba<=max_lba);
+	ASSERT(sec_cnt>0);
+	lock_acquire(&hd->my_channel->lock);//因为有两个硬盘，但是共用一个通道 公共资源 防止其他线程
+	//1  选disk
+	select_disk(hd);
+	
+	uint32_t secs_op;//每次操作的sector 数 （sec_cnt有可能远大于256）
+	uint32_t secs_done=0;//完成数
+	while(secs_done<sec_cnt){
+		if((secs_done+256)<=sec_cnt){
+			secs_op=256;
+		}else{
+			secs_op=sec_cnt-secs_done;
+		}
+		//2 选lba sec_cnt
+		select_sector(hd,lba+secs_done,secs_op);
+
+		//3 read
+		cmd_out(hd->my_channel,CMD_READ_SECTOR);
+
+		//4 立即阻塞自己 等待硬盘完成读取后发起中断唤醒
+		sema_down(&hd->my_channel->disk_done);//用sema_down而不是thread_block 是为了方便唤醒， struct semaphore中维护了block在此的thread
+		//链表，容易unblock，单纯block 不好unblock
+		if( !busy_wait(hd)){//如果发现读取不了
+			char error[64];
+			sprintf(error,"%s read sector %d failed!\n",hd->name,lba);
+			PANIC(error);
+		}
+		//5 从缓冲区中读出
+		read_from_sector(hd,(void*)(  (uint32_t)buf + secs_done*512  ),secs_op);
+
+		secs_done+=secs_op;
+	}
+	lock_release(&hd->my_channel->lock);//释放通道
+}
+
+
+void ide_write(struct disk*hd,uint32_t lba,void*buf,uint32_t sec_cnt){
+	ASSERT(lba<=max_lba);
+	ASSERT(sec_cnt>0);
+	lock_acquire(&hd->my_channel->lock);//因为有两个硬盘，但是共用一个通道 公共资源 防止其他线程
+	//1  选disk
+	select_disk(hd);
+	
+	uint32_t secs_op;//每次操作的sector 数 （sec_cnt有可能远大于256）
+	uint32_t secs_done=0;//完成数
+	while(secs_done<sec_cnt){
+		if((secs_done+256)<=sec_cnt){
+			secs_op=256;
+		}else{
+			secs_op=sec_cnt-secs_done;
+		}
+		//2 选lba sec_cnt
+		select_sector(hd,lba+secs_done,secs_op);
+
+		//3 read
+		cmd_out(hd->my_channel,CMD_WRITE_SECTOR);
+
+
+		//写硬盘则不用准备 所以不用阻塞自己 这一步
+		// //4 立即阻塞自己 等待硬盘完成读取后发起中断唤醒
+		// sema_down(&hd->my_channel->disk_done);//用sema_down而不是thread_block 是为了方便唤醒， struct semaphore中维护了block在此的thread
+		//链表，容易unblock，单纯block 不好unblock
+		if( !busy_wait(hd)){//如果发现读取不了
+			char error[64];
+			sprintf(error,"%s read sector %d failed!\n",hd->name,lba);
+			PANIC(error);
+		}
+		//4 从缓冲区中读出
+		write_to_sector(hd,(void*)(  (uint32_t)buf + secs_done*512  ),secs_op);
+
+		//5 写完数据后阻塞自己 等中断唤醒
+		sema_down(&hd->my_channel->disk_done);
+
+		secs_done+=secs_op;
+	}
+
+	lock_release(&hd->my_channel->lock);//释放通道
+}
+void intr_hd_handler(uint8_t irq_no){
+	ASSERT(irq_no==(0x2e)||irq_no==(0x2f));// irq14 15中断码
+	uint8_t ch_no=irq_no-0x2e;
+	struct ide_channel* channel=&channels[ch_no];
+	ASSERT(channel->irq_no==irq_no);
+	if(channel->expecting_intr){
+		channel->expecting_intr=false;
+		sema_up(&channel->disk_done) ;
+		
+		//读status 让硬盘知道此中断已经被处理 继续操作
+		inb(reg_status(channel));
+	}
+}
+//初始化ide
+void ide_init(){
+	printfk("ide_init start\n");
+	uint8_t hd_cnt= *((uint8_t*)hd_cnt_addr);
+	ASSERT(hd_cnt>0);
+	channel_cnt=DIV_ROUND_UP(hd_cnt,2);
+	struct ide_channel* channel;
+	uint8_t channel_no=0;
+	while(channel_no<channel_cnt){
+		channel=&channels[channel_no];
+		sprintf(channel->name,"ide%d",channel_no);
+		switch(channel_no){
+			case 0:
+				channel->port_base=0x1f0;
+				channel->irq_no=0x20+14;// irq0对应中断码是0x20 irq14 0x20+14  
+				break;
+			case 1:
+				channel->port_base=0x170;
+				channel->irq_no=0x20+15;
+				break;
+		}
+		channel->expecting_intr=false;
+		lock_init(&channel->lock);
+		sema_init(&channel->disk_done,0);
+
+		//注册irq14 15 handler
+		register_handler(channel->irq_no,intr_hd_handler);
+
+		channel_no++;
+	}
+	printfk("ide_init done\n");
 }
