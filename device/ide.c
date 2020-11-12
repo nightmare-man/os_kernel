@@ -105,7 +105,7 @@ static void read_from_sector(struct disk*hd,void* buf,uint8_t sec_cnt){
 	}else{
 		size_in_byte=sec_cnt*512;
 	}
-	insw(reg_data(hd->my_channel),buf,size_in_byte);
+	insw(reg_data(hd->my_channel),buf,size_in_byte/2);
 }
 
 //以下函数写入cnt个sector到buf 同上
@@ -116,7 +116,7 @@ static void write_to_sector(struct disk*hd,void* buf,uint8_t sec_cnt){
 	}else{
 		size_in_byte=sec_cnt*512;
 	}
-	outsw(reg_data(hd->my_channel),buf,size_in_byte);
+	outsw(reg_data(hd->my_channel),buf,size_in_byte/2);
 }
 
 //以下函数 最多等待（休眠）30s，然后返回cmd执行状态
@@ -269,7 +269,7 @@ static void identify_disk(struct disk*hd){
 	uint32_t sectors=*(uint32_t*)&id_info[60*2];
 	printfk("  SECTORS: %d\n",sectors);
 	printfk("  CAPACITY: %dMB\n",sectors*512/1024/1024);
-	printfk("%s",buf);
+	
 }
 
 //以下函数递归的扫描分区信息， 传入hd ext_lba(mbr/ebr所在扇区lba)
@@ -332,7 +332,7 @@ void ide_init(){
 	uint8_t hd_cnt= *((uint8_t*)hd_cnt_addr);
 	ASSERT(hd_cnt>0);
 	channel_cnt=DIV_ROUND_UP(hd_cnt,2);
-	//printfk("channel_cnt:%d\n",channel_cnt);
+	
 	struct ide_channel* channel;
 	uint8_t channel_no=0;
 	uint8_t dev_no=0;
@@ -366,9 +366,7 @@ void ide_init(){
 			hd->dev_no=dev_no;
 			
 			sprintf(hd->name,"sd%c",'a'+channel_no*2+dev_no);//设置默认磁盘名
-			printfk("111\n");
 			identify_disk(hd);
-			printfk("222\n");
 			if(dev_no!=0){//只扫描第二个磁盘，因为我们第一个磁盘没分区
 				partition_scan(hd,0);//
 			}

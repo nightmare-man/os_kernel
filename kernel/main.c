@@ -34,10 +34,6 @@
 			2.不将任何代码至于main函数前面
 */
 
-// void test(){
-// 	put_str("this is test\n");
-// 	while(1);
-// }
 
 //在print.s中 trans_table是一个全局的 .data段的的标号，
 //标号实际会被汇编器翻译成一个地址，而地址里的数据 也就是我们在标号后面跟上的db 后的
@@ -57,7 +53,7 @@ void u_prog_b();
 int main(){
 	
 	init_all();
-	
+	while(1);
 	printfk("main thread pid is %x\n",getpid());
 
 	//thread_start("thread1",31,func1,"t1 ");

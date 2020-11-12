@@ -520,6 +520,7 @@ void sys_free(void*ptr){
 			for(block_idx=0;block_idx<a->desc->block_per_arena;block_idx++){
 				b=arena2block(a,block_idx);
 				ASSERT(elem_find(&a->desc->free_list,&b->free_elem));//要arena中的每个块都在空闲链表里，就可以释放这个arena了
+				list_remove(&b->free_elem);//free arena后也要在对应的desc->free_list 中remove 块的elem
 			}
 			mfree_page(PF,a,1);
 		}
