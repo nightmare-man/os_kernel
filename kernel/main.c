@@ -53,7 +53,7 @@ void u_prog_b();
 int main(){
 	
 	init_all();
-	while(1);
+
 	printfk("main thread pid is %x\n",getpid());
 
 	//thread_start("thread1",31,func1,"t1 ");
@@ -76,7 +76,7 @@ int main(){
 		//但是再怎么样也无法直接使用console_put函数，因为如果获取锁时阻塞了自己，那么需要调用开关中断函数，sti cli指令是cpl3时永远无法执行的
 		//经测试，userprocess cpl为0时（通过设置startprocess里的cs）是可以执行console_put的
 		//想在cpl3下执行这些操作硬件或者公共资源的想法是不好的，还是要通过系统调用，下一章即是，未完待续！！！
-		printfk("this is main thread\n");
+		//printfk("this is main thread\n");
 		
 		
 		//thread_block(TASK_BLOCKED);//干掉全部线程， idle线程接管cpu

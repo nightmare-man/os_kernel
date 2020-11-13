@@ -73,6 +73,7 @@ static void select_disk(struct disk*hd){
 	if(hd->dev_no==1){
 		reg_device|=BIT_DEV_DEV;//置1 从盘
 	}
+	outb(reg_dev(hd->my_channel),reg_device);
 }
 
 static void select_sector(struct disk*hd,uint32_t lba,uint8_t sec_cnt){
@@ -300,6 +301,7 @@ static void partition_scan(struct disk* hd,uint32_t ext_lba){
 				hd->prim_parts[p_no].belong_to=hd;
 				list_append(&partition_list,&hd->prim_parts[p_no].part_tag);//加入分区链表;
 				sprintf(hd->prim_parts[p_no].name,"%s%d",hd->name,p_no+1);
+				printfk("name:%s\n",hd->prim_parts[l_no].name);
 				p_no++;
 				
 			}else{
@@ -311,7 +313,9 @@ static void partition_scan(struct disk* hd,uint32_t ext_lba){
 				hd->logic_parts[l_no].sec_cnt=p[part_idx].sec_cnt;
 				hd->logic_parts[l_no].belong_to=hd;
 				list_append(&partition_list,&hd->logic_parts[l_no].part_tag);
+				
 				sprintf(hd->logic_parts[l_no].name,"%s%d",hd->name,l_no+5);// 逻辑分区标号从5开始
+				printfk("name:%s\n",hd->logic_parts[l_no].name);
 				l_no++;
 			}
 		}
@@ -357,7 +361,7 @@ void ide_init(){
 
 		//注册irq14 15 handler
 		register_handler(channel->irq_no,intr_hd_handler);
-		
+		list_init(&partition_list);
 		//初始化磁盘channel->devces
 
 		while(dev_no<2){
@@ -367,7 +371,7 @@ void ide_init(){
 			
 			sprintf(hd->name,"sd%c",'a'+channel_no*2+dev_no);//设置默认磁盘名
 			identify_disk(hd);
-			if(dev_no!=0){//只扫描第二个磁盘，因为我们第一个磁盘没分区
+			if(dev_no==1){//只扫描第二个磁盘，因为我们第一个磁盘没分区
 				partition_scan(hd,0);//
 			}
 			p_no=0;
