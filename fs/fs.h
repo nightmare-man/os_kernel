@@ -9,5 +9,5 @@ enum file_types{
 	FT_REGULAR,
 	FT_DIRECTORY
 };
-
+void filesys_init();
 #endif

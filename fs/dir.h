@@ -4,6 +4,7 @@
 #include "./inode.h"
 #include "../lib/kernel/stdint.h"
 #include "./fs.h"
+#include "./inode.h"
 //临时储存目录的结构， inode*指向已打开文件inode链表中的一个，而dir_pos则是在目录中的偏移位置
 //必然是目录项大小的整数倍
 struct dir{

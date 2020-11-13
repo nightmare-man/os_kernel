@@ -7,6 +7,10 @@
 #include "../lib/kernel/memory.h"
 #include "../lib/kernel/stdint.h"
 #include "../lib/string.h"
+#include "../device/ide.h"
+
+extern uint8_t channel_cnt;//在ide.c中定义 在ide_init里初始化
+extern struct ide_channel channels[2];//同样
 static void partition_format(struct disk*hd,struct partition*part){
 
 	uint32_t boot_sector_sects=1;
@@ -25,7 +29,7 @@ static void partition_format(struct disk*hd,struct partition*part){
 	
 	//1 初始化super_block并写入磁盘
 	struct super_block sb;
-	sb.maigc=0x19980114;//文件系统类型
+	sb.magic=0x19980114;//文件系统类型
 	sb.sec_cnt=part->sec_cnt;
 	sb.inode_cnt=MAX_FILES_PER_PART;
 	sb.part_lba_start=part->start_lba;
@@ -49,7 +53,9 @@ static void partition_format(struct disk*hd,struct partition*part){
 	 data_lba:0x%x\n  data_sectors:0x%x\n",sb.magic,sb.part_lba_start,sb.sec_cnt,sb.inode_cnt,sb.block_bitmap_lba,sb.block_bitmap_sects,\
 	sb.inode_bitmap_lba,sb.inode_bitmap_sects,sb.inode_table_lba,sb.inode_table_sects,sb.data_start_lba,real_free_sects);
 
-	 struct disk*hd=part->belong_to;//不用新建一个disk结构，而是直接用指针，实体在ide.c里的有（struct ide_channel数组channels  而channel里有disk数组deives[2]）
+	//struct disk*hd=part->belong_to;//不用新建一个disk结构，而是直接用指针，实体在ide.c里的有（struct ide_channel数组channels  而channel里有disk数组deives[2]）
+	//这句作者写错了？已经传入了disk*啊
+	
 	ide_write(hd,part->start_lba+1,&sb,1);//写入超级块
 	printfk("super_block_lba:0x%x\n",part->start_lba+1);
 
@@ -73,7 +79,7 @@ static void partition_format(struct disk*hd,struct partition*part){
 	memset(&buf[block_bitmap_last_byte],0xff,last_size);//先全部置1
 
 	uint8_t bit_idx;
-	for(bit_idx=0;i<block_bitmap_last_bit;i++){
+	for(bit_idx=0;bit_idx<block_bitmap_last_bit;bit_idx++){
 		buf[block_bitmap_last_byte] &= ~(1<<bit_idx);//~取反 某一位置0 用该位&0 其余&1
 	}
 	ide_write(hd,sb.block_bitmap_lba,buf,sb.block_bitmap_sects);
@@ -89,7 +95,7 @@ static void partition_format(struct disk*hd,struct partition*part){
 	struct inode* root_dir_inode=(struct inode*)buf;
 	root_dir_inode->i_no=0;
 	root_dir_inode->i_size=sb.dir_entry_size*2;//初始化就两个目录项 "./ " "../"
-	root_dir_inode->i_blocks=sb.data_start_lba;//root_dir 在第0个数据块
+	root_dir_inode->i_blocks[0]=sb.data_start_lba;//root_dir 在第0个数据块
 	ide_write(hd,sb.inode_table_lba,buf,sb.inode_table_sects);
 
 	//5 初始化第0个数据块(根目录) 并写入
@@ -111,4 +117,45 @@ static void partition_format(struct disk*hd,struct partition*part){
 	printfk("  root_dir_lba:0x%x\n",sb.data_start_lba);
 	printfk("%s format done\n",part->name);
 	sys_free(buf);
+}
+void filesys_init(){
+	uint8_t channel_no=0,dev_no=0,part_idx=0;
+	struct super_block* sb_buf=(struct super_block*)sys_malloc(sizeof(struct super_block));
+	if(sb_buf==NULL){
+		PANIC("alloc memory failed!!\n");
+	}
+	printfk("searching filesystem......\n");
+	while(channel_no<channel_cnt){
+		dev_no=0;
+		while(dev_no<2){
+			if(channel_no==0&&dev_no==0){//跳过ata0_master 裸盘
+				dev_no++;
+				continue;
+			}
+			struct disk*hd=&channels[channel_no].devices[dev_no];
+			struct partition*part=hd->prim_parts;
+			while(part_idx<12){
+				if(part_idx==4){//到第五个分区时为逻辑分区
+					part=hd->logic_parts;
+				}
+				if(part->sec_cnt!=0){//分区存在（channels作为全局变量定义的，因此里面内嵌的disk及partition结构都默认为NULL，
+				//这样判断理论上是没问题的，不过 自己没有memeset初始化的结构还是不要这么判断比较好）
+					memset(sb_buf,0,SECTOR_SIZE);
+					ide_read(hd,part->start_lba+1,sb_buf,1);
+					if(sb_buf->magic==0x19980114){
+						printfk("%s has filesystem\n",part->name);
+					}else{//其他文件系统都不支持 当作没有文件系统 format
+						printfk("formatting %s's partition %s......",hd->name,part->name);
+						partition_format(hd,part);
+					}
+
+				}
+				part_idx++;
+				part++;
+			}
+			dev_no++;
+		}
+		channel_no++;
+	}
+	sys_free(sb_buf);
 }
