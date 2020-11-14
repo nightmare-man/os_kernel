@@ -21,6 +21,9 @@ extern void intr_exit(void);//定义在kernel.s里中断处理程序的返回部
 //这个start_process会设置好intr_stack 也就是中断返回时的栈的信息，然后将esp更新到intr_stack的最底端pop拿到上下文
 //通过中断的iret返回 实现特权级的切换（0-3）  （能过切换特权级的就只有 中断返回和任务返回，iret行 ret不行）,到用户代码段执行（特权级3）
 
+//用户进程的中断模型则是，进入中断处理程序时，仍在用户进程内（pdt不变cr3不更新tss的esp0，但是esp会载入tss里esp0的值）
+//除非执行schedule
+
 //对于线程的切换 认为ret到kernel_thread时就到了新线程了
 //对于用户进程同样是，到了kernel_thread就到了该进程的内核态
 //执行完start_process后就到了进程的用户态
@@ -45,7 +48,7 @@ void start_process(void* filename_){
 	//分配用户态线性地址空间的最高一页，对应的物理页是用户内存池分配的，作为栈区，栈顶指针初始为页的最高地址
 	proc_stack->esp=(void*)((uint32_t)get_a_page(PF_USER,USER_STACK3_VADDR)+PG_SIZE);
 	proc_stack->ss=SELECTOR_U_DATA;
-	asm volatile("movl %0,%%esp;jmp intr_exit"::"g"(proc_stack):"memory");//更新esp0 切换到用户进程的内核态的intr_stack
+	asm volatile("movl %0,%%esp;jmp intr_exit"::"g"(proc_stack):"memory");//更新esp 切换到用户进程的内核态的intr_stack
 	//从此栈pop拿到上下文 回到新进程的特权级3 代码和特权级3的栈 和数据段
 }
 

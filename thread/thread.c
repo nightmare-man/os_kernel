@@ -70,6 +70,18 @@ void init_thread(struct task_struct* pthread,char*name,int prio){
 	pthread->self_kstack=(uint32_t*)((uint32_t)pthread+PG_SIZE);//self_kstack 是线程自己使用的栈的栈顶，初始状态应该是PCB（process 
 	//control block）的最高处,所以是分配的地址（最低处）+页大小
 	pthread->stack_magic=0x19980114;//定义的栈边界检测 魔数
+
+
+	//初始化文件描述符表
+	pthread->fd_table[0]=0;
+	pthread->fd_table[1]=1;
+	pthread->fd_table[2]=2;
+
+	uint8_t fd_idx=3;
+	while(fd_idx<MAX_FILES_OPEN_PER_PROC){
+		pthread->fd_table[fd_idx]=-1;
+		fd_idx++;
+	}
 }
 
 //以下函数创建一个线程 并将该线程加入到ready链表 all链表 （1 初始tcb 2初始化tcb->thread_task上下文 3加入链表）

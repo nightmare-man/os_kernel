@@ -19,7 +19,7 @@ struct tss tss;
 //以下函数设置进程的tss的esp0，而不是立即改变esp，设置了tss的esp0，这样进程在运行时才能正常切换到其内核态，正常响应
 //中断
 void update_tss_esp(struct task_struct* pthread){
-	tss.esp0=(uint32_t*)( (uint32_t)pthread+PG_SIZE);
+	tss.esp0=(uint32_t*)( (uint32_t)pthread+PG_SIZE);//各执行流的0特权级栈都在其tcb里（内核空间）
 }
 //以下函数构造descriptor  值得注意的是 返回值是个结构 对于结构的赋值 和传递 都是内存块复制为基础 并非指针操作
 static struct gdt_desc make_gdt_desc(uint32_t*desc_addr,uint32_t limit,uint8_t attr_low,uint8_t attr_high){
