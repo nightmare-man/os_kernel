@@ -3,6 +3,7 @@
 #include "../device/ide.h"
 #include "./fs.h"
 #include "../thread/thread.h"
+#include "../lib/kernel/interrupt.h"
 struct inode_position{
 	bool two_sec;//是否跨越扇区
 	uint32_t sec_lba;//
@@ -78,7 +79,7 @@ struct inode* inode_open(struct partition*part,uint32_t i_no){
 	/*
 		底下这一串操作堪称666
 		首先为了实现已经打开的inode结构在内存里的缓存，我们在inode的结构里加入了list_elem 
-		然后我们在每个partition里搞了一个链表，来保存他们，要让内核和使用系统调用的进程都能访问，
+		然后我们在每个partition里搞了一个链表，来保存他们，是所有线程和进程都共享的，
 		partition里的list是内核的全局变量，内核态，但是list_elem inode是malloc的内存，而
 		所以要求malloc分配的地址是内核态的，但是用户进程 通过系统调用使用这个函数 malloc还是
 		用户态
@@ -86,6 +87,10 @@ struct inode* inode_open(struct partition*part,uint32_t i_no){
 		之后再恢复
 
 		进入中断或者调用门 仍是原进程，只有scdedule时才更换cr3 更换esp0 才是切换进程
+
+
+		另外 共享资源是链表，对链表的访问应该是加锁实现原子的，但是这里只有append 部分内部关中断实现了，
+		前面比较i_no时没有，因此不太稳妥，后面继续看吧，多线程这块比较麻烦
 	*/
 	struct task_struct*cur_thread=running_thread();
 	uint32_t cur_pgdir_bake=cur_thread->pgdir;
@@ -106,4 +111,29 @@ struct inode* inode_open(struct partition*part,uint32_t i_no){
 	inode_tar->open_cnt=1;
 	sys_free(inode_buf);
 	return inode_tar;
+}
+//以下函数关闭inode或者减少inode的打开数
+void inode_close(struct inode*i_node){
+	enum intr_status old=intr_disable();//链表是公共资源 任何访问都应该互斥
+	if(--i_node->open_cnt==0){
+		list_remove(&i_node->open_list_elem);
+		struct task_struct*cur_thread=running_thread();
+		uint32_t cur_pgdir_bake=cur_thread->pgdir;
+		sys_free(i_node);
+		cur_thread->pgdir=cur_pgdir_bake;
+	}
+	intr_set_status(old);
+}
+
+void inode_init(uint32_t inode_no,struct inode* new_inode){
+	new_inode->i_no=inode_no;
+	new_inode->i_size=0;
+	new_inode->open_cnt=0;
+	new_inode->write_deny=false;
+
+	uint8_t sec_idx=0;
+	while(sec_idx<13){
+		new_inode->i_blocks[sec_idx]=0;
+		sec_idx++;
+	}
 }
