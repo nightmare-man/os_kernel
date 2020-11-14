@@ -6,7 +6,7 @@
 #include "../thread/sync.h"
 #include "../lib/kernel/stdio_kernel.h"
 #include "../lib/user/stdio.h"
-
+#include "../fs/super_block.h"
 //关于这三个结构的定义顺序，disk中内嵌了partition数组，所以必须先定义partition
 //而partition中用了disk*，但是我们要知道，对于指定平台的c程序，所有指针的大小都是一样的（4/8字节），因此可以引用不知道类型的指针
 //因此partition要先定义 在定义disk 同理最后定义ide_channel

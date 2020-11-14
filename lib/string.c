@@ -43,7 +43,8 @@ uint32_t strlen(const char* str){
 	while(*p++);
 	return (p-str-1); //因为p是在判断之后+1的 因此会多1
 }
-int8_t strcmp(const char*a,const char* b){
+
+int8_t strcmp(const char*a,const char* b){//字典序 a>b ret 1 a=b ret 0 a<b ret -1
 	ASSERT(a!=NULL && b!=NULL);
 	while(*a!=0 && *a==*b){
 		a++;

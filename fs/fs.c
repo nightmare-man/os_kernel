@@ -8,9 +8,14 @@
 #include "../lib/kernel/stdint.h"
 #include "../lib/string.h"
 #include "../device/ide.h"
+#include "../lib/kernel/list.h"
 
 extern uint8_t channel_cnt;//在ide.c中定义 在ide_init里初始化
 extern struct ide_channel channels[2];//同样
+struct partition*cur_part;//记录当前所选用的分区 ，由mout_parttion负责切换
+extern struct list partition_list;// 所有分区的链表，定义在ide.c里，由partition_scan初始化
+
+
 static void partition_format(struct disk*hd,struct partition*part){
 
 	uint32_t boot_sector_sects=1;
@@ -118,6 +123,62 @@ static void partition_format(struct disk*hd,struct partition*part){
 	printfk("%s format done\n",part->name);
 	sys_free(buf);
 }
+
+//sb_buf 以及其他的几个malloc的内存都没有free，可能是后面还要用？
+//但是保存分配的地址都是局部变量，出函数就内存泄漏了啊
+//mark以下
+
+//以下函数接收list_elem 检查对应的partition->name和传入的参数是否一致，
+//如果一致就mout该partition，用作traversal函数的参数实现指定分区的mout
+static bool mount_partition(struct list_elem*pelem,int arg){
+	char*part_name=(char*)arg;
+	struct partition* part=elem2entry(struct partition,part_tag,pelem);
+	if(!strcmp(part_name,part->name)){//如果返回0 说明相同
+		cur_part=part;//更新cur_part
+		struct disk*hd=cur_part->belong_to;
+
+
+		//1 加载super_block
+		struct super_block* sb_buf=(struct super_block*)sys_malloc( SECTOR_SIZE );//缓冲区
+		//应该为扇区大小的整数倍
+		cur_part->sb=(struct super_block*)sys_malloc(sizeof(struct super_block));
+		if(cur_part->sb==NULL){
+			PANIC("  alloc memory faild\n");
+		}
+		memset(sb_buf,0,1);
+		ide_read(hd,cur_part->start_lba+1,sb_buf,1);
+		memcpy(cur_part->sb,sb_buf,sizeof(struct super_block));
+
+
+		//2 加载block_bitmap		
+		cur_part->block_bitmap.bits=(uint8_t*)sys_malloc(sb_buf->block_bitmap_sects*SECTOR_SIZE);
+		if(cur_part->block_bitmap.bits==NULL){
+			PANIC("  alloc memory faild\n");
+		}
+		cur_part->block_bitmap.btmp_bytes_len=sb_buf->block_bitmap_sects*SECTOR_SIZE;//有一部分不对应资源 但是没关系，我们早就置1了
+		ide_read(hd,sb_buf->block_bitmap_lba,cur_part->block_bitmap.bits,sb_buf->block_bitmap_sects);
+
+		//3 加载inode位图
+		cur_part->inode_bitmap.bits=(uint8_t*)sys_malloc(sb_buf->inode_bitmap_sects*SECTOR_SIZE);
+		if(cur_part->inode_bitmap.bits==NULL){
+			PANIC("  alloc memory faild\n");
+		}
+		cur_part->inode_bitmap.btmp_bytes_len=sb_buf->inode_bitmap_sects*SECTOR_SIZE;
+		ide_read(hd,sb_buf->inode_bitmap_lba,cur_part->inode_bitmap.bits,sb_buf->inode_bitmap_sects);
+
+
+		//这里没有在mount时就读入inode_table 因为和对应资源的位图不同，位图需要及时更新，因此需要第一时间读入内存，然后修改后立马写入
+		//而inode_table则太大了，且里面是记载文件，我们现在只挂载 不操作文件，因此没有读入内存
+
+		//4 list_init
+		list_init(&cur_part->open_inodes);
+		printfk("mount %s done!\n",cur_part->name);
+
+		
+	}
+	return false;//ret false是为list_traversal继续遍历的要求
+}
+
 void filesys_init(){
 	uint8_t channel_no=0,dev_no=0,part_idx=0;
 	struct super_block* sb_buf=(struct super_block*)sys_malloc(sizeof(struct super_block));
@@ -158,4 +219,6 @@ void filesys_init(){
 		channel_no++;
 	}
 	sys_free(sb_buf);
+	char default_part[8]="sdb1";
+	list_traversal(&partition_list,mount_partition,default_part);
 }
