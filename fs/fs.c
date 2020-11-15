@@ -129,7 +129,12 @@ static void partition_format(struct disk*hd,struct partition*part){
 //mark以下
 
 //以下函数接收list_elem 检查对应的partition->name和传入的参数是否一致，
-//如果一致就mout该partition，用作traversal函数的参数实现指定分区的mout
+//如果一致就mout该partition，用作traversal函数的参数实现指定分区的mount
+
+//mount的本质 是加载该分区的 super_block  block bitmap inode bitmap 
+//并初始化 该分区的open_inodes队列
+//不立即加载inode table 因为特别大 没必要一次加载到内存，可以需要时再加载
+
 static bool mount_partition(struct list_elem*pelem,int arg){
 	char*part_name=(char*)arg;
 	struct partition* part=elem2entry(struct partition,part_tag,pelem);

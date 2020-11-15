@@ -9,7 +9,7 @@ typedef uint32_t pid_t;
 
 //thread_func即是 函数变量类型
 #define default_prio 31
-#define MAX_FILES_OPEN_PER_PROC 8;
+#define MAX_FILES_OPEN_PER_PROC 8
 //tcb thread control block 分布
 // 从低到高 task_struct  thread_stack intr_stack
 //线程被创建时 esp初始会指向 tcb最高地址 然后 按照顺序 压入intr相关数据 压入thread 相关数据 
