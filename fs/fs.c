@@ -135,7 +135,7 @@ static void partition_format(struct disk*hd,struct partition*part){
 //并初始化 该分区的open_inodes队列
 //不立即加载inode table 因为特别大 没必要一次加载到内存，可以需要时再加载
 
-static bool mount_partition(struct list_elem*pelem,int arg){
+static bool mount_partition(struct list_elem*pelem,int32_t arg){
 	char*part_name=(char*)arg;
 	struct partition* part=elem2entry(struct partition,part_tag,pelem);
 	if(!strcmp(part_name,part->name)){//如果返回0 说明相同
@@ -225,5 +225,5 @@ void filesys_init(){
 	}
 	sys_free(sb_buf);
 	char default_part[8]="sdb1";
-	list_traversal(&partition_list,mount_partition,default_part);
+	list_traversal(&partition_list,mount_partition,(int32_t)default_part);
 }

@@ -323,7 +323,7 @@ static void partition_scan(struct disk* hd,uint32_t ext_lba){
 	}
 	sys_free(bs);//释放保存mbr ebr的内存，分区都在hd->logic_parts 和hd->prim_parts链里
 }
-static bool partition_info(struct list_elem*pelem,int arg_UNUSED){
+static bool partition_info(struct list_elem*pelem,int32_t arg_UNUSED){
 	struct partition*part=elem2entry(struct partition,part_tag,pelem);
 	printfk("   %s start_lba:0x%x, sec_cnt:0x%x\n",part->name,part->start_lba,part->sec_cnt);
 	return false;
@@ -384,7 +384,7 @@ void ide_init(){
 		channel_no++;
 	}
 	printfk("\n   all partition info\n");
-	list_traversal(&partition_list,partition_info,(int)NULL);
+	list_traversal(&partition_list,partition_info,(int32_t)NULL);
 	printfk("ide_init done\n");
 }
 

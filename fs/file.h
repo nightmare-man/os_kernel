@@ -21,5 +21,5 @@ enum bitmap_type{
 	BLOCK_BITMAP
 };
 
-#define MAX_FILE_OPEN 32 //系统最大可打开的文件数   文件结构表的上限
+#define MAX_FILE_OPEN 32 //系统最大可打开的文件次数   文件结构表的上限（注意是次数而不是个数 因为一个文件可以打开多次，在文件表里占用多个结构）
 #endif

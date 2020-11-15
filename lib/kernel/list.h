@@ -33,7 +33,7 @@ void list_remove(struct list_elem*elem);
 struct list_elem* list_pop(struct list*ls);
 bool elem_find(struct list*ls,struct list_elem*elem);
 bool list_empty(struct list*ls);
-struct list_elem* list_traversal(struct list*ls,function func,int arg);
+struct list_elem* list_traversal(struct list*ls,function func,int32_t arg);
 uint32_t list_len(struct list*ls);
 
 #endif

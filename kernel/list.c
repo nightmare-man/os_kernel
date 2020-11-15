@@ -63,7 +63,7 @@ bool list_empty(struct list*ls){
 }
 
 //以下函数为迭代器：遍历链表，对每个元素调用 传入参数是 elem和arg 如果该元素满足条件就返回true 
-struct list_elem* list_traversal(struct list*ls,function func,int arg){
+struct list_elem* list_traversal(struct list*ls,function func,int32_t arg){
 	struct list_elem* elem=ls->head.next;//默认是第一个
 	if(list_empty(ls)){
 		return NULL;

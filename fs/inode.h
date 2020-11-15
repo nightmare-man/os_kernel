@@ -2,6 +2,7 @@
 #define _INODE_H_
 #include "../lib/kernel/stdint.h"
 #include "../lib/kernel/list.h"
+#include "../device/ide.h"
 struct inode{
 	uint32_t i_no;//inode的编号
 	uint32_t i_size;//文件的大小 字节单位
@@ -11,6 +12,8 @@ struct inode{
 	//512 一个索引4byte 因此上限是12+128=140个块 140*512byte=70kb 文件上限）
 	struct list_elem open_list_elem;//inode_stable 存在磁盘上，读一个文件需要先从磁盘读其inode，因此我们构建一个inode 列表，缓存已经读过的inode
 };
-
-
+void inode_sync(struct partition* part,struct inode* inode,void*io_buf);
+struct inode* inode_open(struct partition*part,uint32_t i_no);
+void inode_close(struct inode*i_node);
+void inode_init(uint32_t inode_no,struct inode* new_inode);
 #endif

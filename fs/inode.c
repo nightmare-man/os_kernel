@@ -62,8 +62,8 @@ void inode_sync(struct partition* part,struct inode* inode,void*io_buf){
 struct inode* inode_open(struct partition*part,uint32_t i_no){
 	struct list_elem* i_elem=part->open_inodes.head.next;//先在已经打开的inode列表里找
 	struct inode* inode_tar;
-	while(i_elem!=part->open_inodes.tail){//没有到尾，继续遍历
-		inode_tar=elem2entry(struct inode,open_elem_list,i_elem);
+	while(i_elem!=&part->open_inodes.tail){//没有到尾，继续遍历
+		inode_tar=elem2entry(struct inode,open_list_elem,i_elem);
 		if(inode_tar->i_no==i_no){
 			inode_tar->open_cnt++;
 			return inode_tar;
@@ -93,7 +93,7 @@ struct inode* inode_open(struct partition*part,uint32_t i_no){
 		前面比较i_no时没有，因此不太稳妥，后面继续看吧，多线程这块比较麻烦
 	*/
 	struct task_struct*cur_thread=running_thread();
-	uint32_t cur_pgdir_bake=cur_thread->pgdir;
+	uint32_t* cur_pgdir_bake=cur_thread->pgdir;
 	cur_thread->pgdir=NULL;
 	inode_tar=(struct inode*)sys_malloc(sizeof(struct inode));
 	cur_thread->pgdir=cur_pgdir_bake;
@@ -107,7 +107,7 @@ struct inode* inode_open(struct partition*part,uint32_t i_no){
 		ide_read(part->belong_to,pos.sec_lba,inode_buf,1);
 	}
 	memcpy(&inode_tar,inode_buf+pos.off_size,sizeof(struct inode));
-	list_push(&part->open_inodes,&inode_tar->open_list_elem);
+	list_push(&part->open_inodes,&inode_tar->open_list_elem);//放在最前面而不是append 因为根据 局部性原理 ，最近可能回经常用到
 	inode_tar->open_cnt=1;
 	sys_free(inode_buf);
 	return inode_tar;
@@ -118,7 +118,7 @@ void inode_close(struct inode*i_node){
 	if(--i_node->open_cnt==0){
 		list_remove(&i_node->open_list_elem);
 		struct task_struct*cur_thread=running_thread();
-		uint32_t cur_pgdir_bake=cur_thread->pgdir;
+		uint32_t* cur_pgdir_bake=cur_thread->pgdir;
 		sys_free(i_node);
 		cur_thread->pgdir=cur_pgdir_bake;
 	}
