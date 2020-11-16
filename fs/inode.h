@@ -3,6 +3,7 @@
 #include "../lib/kernel/stdint.h"
 #include "../lib/kernel/list.h"
 #include "../device/ide.h"
+#include "./inode.h"
 struct inode{
 	uint32_t i_no;//inode的编号
 	uint32_t i_size;//文件的大小 字节单位

@@ -42,7 +42,7 @@ struct ide_channel channels[2];
 
 uint32_t ext_part_lba_base =0;//扩展分区的起始扇区
 uint8_t p_no=0,l_no=0;//记录硬盘主分区和逻辑分区下标
-struct list partition_list;//分区链表
+struct list partition_list;//分区链表，记录所有硬盘的所有分区
 
 struct partition_table_entry{//dpt项结构
 	uint8_t bootable;

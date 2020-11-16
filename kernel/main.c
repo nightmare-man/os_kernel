@@ -22,6 +22,8 @@
 #include "../lib/user/stdio.h"
 #include "../lib/kernel/stdio_kernel.h"
 #include "../device/ide.h"
+#include "../fs/fs.h"
+
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -54,14 +56,15 @@ int main(){
 	
 	init_all();
 
-	printfk("main thread pid is %x\n",getpid());
+	//printfk("main thread pid is %x\n",getpid());
 
 	//thread_start("thread1",31,func1,"t1 ");
 	//thread_start("thread2",31,func2,"t2 ");
 	// process_execute(u_prog_a,"user_prog_a");
 	// process_execute(u_prog_b,"user_prog_b");
+	sys_open("/file1",O_CREAT);
 	intr_enable();	//intr_enable必须在init_all之后调用，因为init_all里的初始化函数使用了put_str 这个时候不允许多线程
-
+	
 	//thread_yeild();
 	//*((int*)0xc010200c)=10;// 我惊讶的发现 即使0xc010200c对应的页表项的p位置0，仍然可以访问，可能是因为我没有写page fault中断？
 	

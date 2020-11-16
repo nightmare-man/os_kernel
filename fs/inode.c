@@ -1,8 +1,12 @@
+#include "./file.h"
 #include "./inode.h"
-#include "../lib/string.h"
-#include "../device/ide.h"
 #include "./fs.h"
+#include "./dir.h"
+#include "../lib/kernel/stdint.h"
+#include "../lib/kernel/stdio_kernel.h"
 #include "../thread/thread.h"
+#include "../device/ide.h"
+#include "../lib/string.h"
 #include "../lib/kernel/interrupt.h"
 struct inode_position{
 	bool two_sec;//是否跨越扇区
@@ -75,7 +79,6 @@ struct inode* inode_open(struct partition*part,uint32_t i_no){
 	struct inode_position pos;
 	inode_locate(part,i_no,&pos);
 
-
 	/*
 		底下这一串操作堪称666
 		首先为了实现已经打开的inode结构在内存里的缓存，我们在inode的结构里加入了list_elem 
@@ -97,6 +100,7 @@ struct inode* inode_open(struct partition*part,uint32_t i_no){
 	cur_thread->pgdir=NULL;
 	inode_tar=(struct inode*)sys_malloc(sizeof(struct inode));
 	cur_thread->pgdir=cur_pgdir_bake;
+	
 
 	char* inode_buf;
 	if(pos.two_sec){
@@ -106,10 +110,17 @@ struct inode* inode_open(struct partition*part,uint32_t i_no){
 		inode_buf=(char*)sys_malloc(512);
 		ide_read(part->belong_to,pos.sec_lba,inode_buf,1);
 	}
-	memcpy(&inode_tar,inode_buf+pos.off_size,sizeof(struct inode));
+
+
+	memcpy(inode_tar,inode_buf+pos.off_size,sizeof(struct inode));
+	
+
 	list_push(&part->open_inodes,&inode_tar->open_list_elem);//放在最前面而不是append 因为根据 局部性原理 ，最近可能回经常用到
 	inode_tar->open_cnt=1;
+
+	cur_thread->pgdir=NULL;
 	sys_free(inode_buf);
+	cur_thread->pgdir=cur_pgdir_bake;
 	return inode_tar;
 }
 //以下函数关闭inode或者减少inode的打开数

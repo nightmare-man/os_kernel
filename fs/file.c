@@ -1,12 +1,15 @@
 #include "./file.h"
 #include "./inode.h"
 #include "./fs.h"
+#include "./dir.h"
 #include "../lib/kernel/stdint.h"
 #include "../lib/kernel/stdio_kernel.h"
 #include "../thread/thread.h"
 #include "../device/ide.h"
-struct file file_table[MAX_FILE_OPEN];//所有进程线程共用的文件结构表
+#include "../lib/string.h"
 
+struct file file_table[MAX_FILE_OPEN];//所有进程线程共用的文件结构表
+extern struct partition*cur_part;
 //inode 是文件数据描述符
 //fd是文件操作描述符
 
@@ -31,7 +34,7 @@ int32_t get_free_slot_in_global(void){
 	return fd_idx;
 }
 
-//将从文件结构表中获取的文件结构下标安装到自己线程或进程的文件描述符数组里
+//此函数将全局文件描述符（文件结构在表里的索引） 安装到tcb里的 描述符表，返回表里的下标（也就是本地文件描述符）
 int32_t pcb_fd_install(int32_t global_fd_idx){
 	struct task_struct* cur=running_thread();
 	uint8_t local_fd_idx=3;
@@ -50,6 +53,7 @@ int32_t pcb_fd_install(int32_t global_fd_idx){
 }
 
 //以下函数 分配一个空闲的inode（没有对应文件的） 返回下标
+//一般调用后 要使用bitmap_sync 同步修改
 int32_t inode_bitmap_alloc(struct partition* part){
 	int32_t bit_idx=bitmap_scan(&part->inode_bitmap,1);//从inode bitmap中找一个空位
 	if(bit_idx==-1){
@@ -66,7 +70,7 @@ int32_t block_bitmap_alloc(struct partition* part){
 		return -1;
 	}
 	bitmap_set(&part->block_bitmap,block_idx,1);
-	return part->sb->data_start_lba+block_idx;
+	return (part->sb->data_start_lba+block_idx);
 }
 
 
@@ -89,4 +93,70 @@ void bitmap_sync(struct partition*part,uint32_t bit_idx,uint8_t btmp){
 			break;
 	}
 	ide_write(part->belong_to,sec_lba,bitmap_off,1);
+}
+int32_t file_create(struct dir* parent,char* filename,uint8_t flag){
+	void* io_buf=(void*)sys_malloc(1024);
+	if(io_buf==NULL){
+		printfk("[file.c]malloc memory fail!\n");
+		return -1;
+	}
+	uint8_t rollback_step=0;
+	int32_t inode_no=inode_bitmap_alloc(cur_part);
+	if(inode_no==-1){
+		printfk("[file.c]malloc inode_bitmap fail!\n");
+		return -1;
+	}
+	struct inode* new_file_inode=(struct inode*)sys_malloc(sizeof(struct inode));
+	if(new_file_inode==NULL){//如果此处失败了，那么前面锁alloc的inode_no也不要了，要回滚 goto rollback
+		printfk("[file.c]malloc memory fail!\n");
+		rollback_step=1;
+		goto rollback;
+	}
+	inode_init(inode_no,new_file_inode);
+
+	int fd_idx=get_free_slot_in_global();
+	if(fd_idx==-1){
+		printfk("[file.c]malloc fd_idx fail!\n");
+		rollback_step=2;
+		goto rollback;
+	}
+	file_table[fd_idx].fd_inodes=new_file_inode;
+	file_table[fd_idx].fd_pos=0;
+	file_table[fd_idx].fd_flag=flag;
+	file_table[fd_idx].fd_inodes->write_deny=false;
+
+	struct dir_entry new_dir_entry;
+	memset(&new_dir_entry,0,sizeof(struct dir_entry));
+	create_dir_entry(filename,inode_no,FT_REGULAR,&new_dir_entry);
+
+	if(!sync_dir_entry(parent,&new_dir_entry,io_buf)){
+		printfk("[file.c]sync_dir_entry fail!\n");
+		rollback_step=3;
+		goto rollback;
+	}
+	memset(io_buf,0,1024);
+	inode_sync(cur_part,parent->inode,io_buf);//因为sync_dir_entry 可能会修改父目录的inode 所以要sync parent->inode
+
+	memset(io_buf,0,1024);
+	inode_sync(cur_part,new_file_inode,io_buf);//文件的inode其实init后都是0，只有open_cnt为1 要sync以下
+
+	bitmap_sync(cur_part,inode_no,INODE_BITMAP);//inode 分配了要同步
+	list_push(&cur_part->open_inodes,&new_file_inode->open_list_elem);//inode 的open_list_elem.prev 和next的修改不sync到硬盘，因为不用持久化
+	new_file_inode->open_cnt=1;
+	sys_free(io_buf);
+	return pcb_fd_install(fd_idx);//将全局的文件描述符索引 安装到本地
+rollback:
+	switch (rollback_step)
+	{
+	case 3:
+		memset(&file_table[fd_idx],0,sizeof(struct file));
+		
+	case 2:
+		sys_free(new_file_inode);
+	case 1:
+		bitmap_set(&cur_part->inode_bitmap,inode_no,0);
+		break;
+	}
+	sys_free(io_buf);
+	return -1;
 }

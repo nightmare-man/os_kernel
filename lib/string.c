@@ -53,6 +53,8 @@ int8_t strcmp(const char*a,const char* b){//字典序 a>b ret 1 a=b ret 0 a<b re
 	return *a<*b?-1:*a>*b;//这里的写法 太炫技了 没啥用，反正看编译器优化 老老实实if else不会死的！
 	//作者这么写的
 }
+
+//找到ch在str中第一次出现的地址
 char* strchr(const char* str,const char ch){
 	ASSERT(str!=NULL);
 	while(*str!=0){
