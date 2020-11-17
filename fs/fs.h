@@ -16,16 +16,16 @@ enum file_types{
 };
 
 enum oflags{
-	O_RONLY,  //读
-	O_WONLY,  //写
-	O_RDWR,  //读写
-	O_CREAT=4 //创建
+	O_RONLY,  //读 0
+	O_WONLY,  //写 1
+	O_RDWR,  //读写 10
+	O_CREAT=4 //创建 100
 };
 
 struct path_search_record{// 搜索的路径记录
-	char searched_path[MAX_PATH_LEN]; //已经查找过的路径 比如 /a/b/c/d 我们按顺序 先找a 不论找到与否 /a是searched_path,如果找不到 就结束 找到就找/a/b //同样更新 searched_path /a/b
-	struct dir* parent_dir;           //记录直接父目录 如果searched path 是 "/a/b"   那么直接父目录是a对应的dir*
-	uint8_t file_type;        //file_type是  b的type 如果b没找到 那就是FT_UNKNOW
+	char searched_path[MAX_PATH_LEN]; //已经查找过的路径 比如 /a/b/c/d  如果我们当前正在查找c，那么不论c是否查找到 应该更新为/a/b/c
+	struct dir* parent_dir;           //总是指向已查找目录的倒数第二级，如果当前的已查找路径是/a/b/c，那么是b的dir*
+	uint8_t file_type;        //file_type已查找目录的最后一级的文件类型，没找到是FT_UNKNOW
 };
 int32_t path_depth_cnt(char* pathname);
 void filesys_init();

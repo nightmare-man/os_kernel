@@ -348,13 +348,14 @@ int32_t sys_open(const char* pathname,uint8_t flags){
 		printfk("[fs.c] sys_open can't open a dir %s\n",pathname);
 		return -1;
 	}
-	ASSERT(flags<7);// 几个open_flags可以用 |组合 最大不能超过7
+	ASSERT(flags<7);// 几个open_flags可以用 |组合 最大不能超过7   o_creat|o_rdwr  是最大值 也就是 100|010 =6 因此不能超过7
 	int32_t fd =-1;
 	struct path_search_record searched_record;
 	memset(&searched_record,0,sizeof(struct path_search_record));
 	uint32_t path_depth=path_depth_cnt((char*)pathname);
 
 	int inode_no=search_file((char*)pathname,&searched_record);
+	printfk("search_depth %s,search type 0x%x,parent inode_no 0x%x",searched_record.searched_path,searched_record.file_type,searched_record.parent_dir->inode->i_no);
 	bool found=inode_no==-1?false:true;
 	if(searched_record.file_type==FT_DIRECTORY){
 		printfk("[fs.c] sys_open can't open a dir %s\n",(char*)pathname);

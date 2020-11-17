@@ -101,6 +101,8 @@ int32_t file_create(struct dir* parent,char* filename,uint8_t flag){
 		return -1;
 	}
 	uint8_t rollback_step=0;
+
+	//1 分配inode
 	int32_t inode_no=inode_bitmap_alloc(cur_part);
 	if(inode_no==-1){
 		printfk("[file.c]malloc inode_bitmap fail!\n");
@@ -114,6 +116,8 @@ int32_t file_create(struct dir* parent,char* filename,uint8_t flag){
 	}
 	inode_init(inode_no,new_file_inode);
 
+
+	//2 从全局文件结构表中找一个空位
 	int fd_idx=get_free_slot_in_global();
 	if(fd_idx==-1){
 		printfk("[file.c]malloc fd_idx fail!\n");
@@ -125,6 +129,7 @@ int32_t file_create(struct dir* parent,char* filename,uint8_t flag){
 	file_table[fd_idx].fd_flag=flag;
 	file_table[fd_idx].fd_inodes->write_deny=false;
 
+	//3 构建dir_entry写入父目录的数据块
 	struct dir_entry new_dir_entry;
 	memset(&new_dir_entry,0,sizeof(struct dir_entry));
 	create_dir_entry(filename,inode_no,FT_REGULAR,&new_dir_entry);
@@ -144,7 +149,10 @@ int32_t file_create(struct dir* parent,char* filename,uint8_t flag){
 	list_push(&cur_part->open_inodes,&new_file_inode->open_list_elem);//inode 的open_list_elem.prev 和next的修改不sync到硬盘，因为不用持久化
 	new_file_inode->open_cnt=1;
 	sys_free(io_buf);
+	//4 安装到进程文件描述符表
 	return pcb_fd_install(fd_idx);//将全局的文件描述符索引 安装到本地
+	
+	// 回滚表 不同阶段的失败回滚步数不一样
 rollback:
 	switch (rollback_step)
 	{
