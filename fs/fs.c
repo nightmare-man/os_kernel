@@ -344,14 +344,12 @@ static int search_file(const char* pathname,struct path_search_record*searched_r
 }
 
 int32_t sys_open(const char* pathname,uint8_t flags){
-	printfk("running!\n");
 	if(pathname[strlen(pathname)-1]=='/'){//如果是目录 不支持 此为打开文件
 		printfk("[fs.c] sys_open can't open a dir %s\n",pathname);
 		return -1;
 	}
 	ASSERT(flags<7);// 几个open_flags可以用 |组合 最大不能超过7
 	int32_t fd =-1;
-	printfk("running!\n");
 	struct path_search_record searched_record;
 	memset(&searched_record,0,sizeof(struct path_search_record));
 	uint32_t path_depth=path_depth_cnt((char*)pathname);
@@ -379,7 +377,6 @@ int32_t sys_open(const char* pathname,uint8_t flags){
 		dir_close(searched_record.parent_dir);
 		return -1;
 	}
-	printfk("running!\n");
 	switch(flags&O_CREAT){
 		case O_CREAT:
 			printfk("creating file\n");
@@ -387,6 +384,7 @@ int32_t sys_open(const char* pathname,uint8_t flags){
 			dir_close(searched_record.parent_dir);
 	
 	}
+	printfk("cur_part is %s ,data block start is 0x%x\n",cur_part->name,cur_part->sb->data_start_lba);
 	return fd;//返回本地文件描述符  此fd是任务tcb->fd_table数组中元素的下标
 
 }

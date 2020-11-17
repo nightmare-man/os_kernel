@@ -95,6 +95,7 @@ void create_dir_entry(char* filename,uint32_t inode_no,uint8_t filetype,struct d
 	ASSERT(strlen(filename)<MAX_FILE_NAME_LEN);
 	d_e->i_no=inode_no;
 	d_e->file_type=filetype;
+	memcpy(d_e->file_name,filename,strlen(filename));
 }
 
 //以下函数传入一个parent dir* 和一个dir_entry
@@ -113,6 +114,7 @@ void create_dir_entry(char* filename,uint32_t inode_no,uint8_t filetype,struct d
 //我修改了作者的代码 改成了判断dir_inode->i_blocks[block_idx]==0 这样才不会对间接块到底有没有判断有误
 bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 	struct inode*dir_inode=parent_dir->inode;
+	
 	uint32_t dir_size=dir_inode->i_size;//目录文件的总大小
 	uint32_t dir_entry_size=cur_part->sb->dir_entry_size;
 
@@ -130,9 +132,12 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 	struct dir_entry*dir_e=(struct dir_entry*)io_buf;//将iobuf当作临时缓冲区 存dir_entry
 	int32_t block_bitmap_idx=-1;
 	block_idx=0;
+	
+	
 	while(block_idx<140){//
 		block_bitmap_idx=-1;
 		if(dir_inode->i_blocks[block_idx]==0){//如果该地址表项为0，说明需要新建一个数据块来储存dir_entry
+
 			block_lba=block_bitmap_alloc(cur_part);
 			if(block_lba==-1){
 				printfk("[sync_dir_entry]alloc bitmap for block fail!\n");
@@ -173,6 +178,7 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 			ide_write(cur_part->belong_to,all_blocks[block_idx],io_buf,1);
 			dir_inode->i_size+=dir_entry_size;
 			return true;
+
 		}
 		
 		//刚开始循环时 all_blocks[block_idx]!=0 对应有数据块，我们看看这些数据块有没有空间放入dir_entry
@@ -180,8 +186,10 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 		uint8_t dir_entry_idx=0;
 		while(dir_entry_idx<dir_entry_per_sec){
 			if((dir_e+dir_entry_idx)->file_type==FT_UNKNOW){
+				
 				//dir_entry 初始化和被删除后都置为 FT_UNKNOW 此处为unknow 说明这个位置空
 				memcpy(dir_e+dir_entry_idx,p_de,dir_entry_size);
+				
 				ide_write(cur_part->belong_to,all_blocks[block_idx],io_buf,1);
 				dir_inode->i_size+=dir_entry_size;
 				return true;

@@ -301,7 +301,7 @@ static void partition_scan(struct disk* hd,uint32_t ext_lba){
 				hd->prim_parts[p_no].belong_to=hd;
 				list_append(&partition_list,&hd->prim_parts[p_no].part_tag);//加入分区链表;
 				sprintf(hd->prim_parts[p_no].name,"%s%d",hd->name,p_no+1);
-				printfk("name:%s\n",hd->prim_parts[l_no].name);
+				
 				p_no++;
 				
 			}else{
@@ -315,7 +315,7 @@ static void partition_scan(struct disk* hd,uint32_t ext_lba){
 				list_append(&partition_list,&hd->logic_parts[l_no].part_tag);
 				
 				sprintf(hd->logic_parts[l_no].name,"%s%d",hd->name,l_no+5);// 逻辑分区标号从5开始
-				printfk("name:%s\n",hd->logic_parts[l_no].name);
+			
 				l_no++;
 			}
 		}
