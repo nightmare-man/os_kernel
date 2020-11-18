@@ -9,3 +9,6 @@ src:
   
   
 reference:《操作系统真象还原》、《从实模式到保护模式》
+
+**文件系统模型**
+![img](./file_system_model.jpg)
