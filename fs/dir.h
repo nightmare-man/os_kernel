@@ -16,7 +16,7 @@
 struct dir_entry{
 	char file_name[MAX_FILE_NAME_LEN];
 	uint32_t i_no;//对应的inode编号
-	uint8_t file_type;
+	enum file_types file_type;
 };
 void dir_close(struct dir*pdir);
 struct dir* dir_open(struct partition* part,uint32_t inode_no);

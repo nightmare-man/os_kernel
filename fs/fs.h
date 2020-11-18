@@ -1,8 +1,8 @@
 #ifndef _FS_H_
 #define _FS_H_
+//fs.h中的函数都是已经封装好的进程的文件操作函数
 #include "../lib/kernel/stdint.h"
 #include "./file.h"
-
 #define MAX_FILES_PER_PART 4096//每个分区最大文件数，也是inode最大编号+1
 #define BITS_PER_SECTOR 4096//每扇区的位数 512*8
 #define SECTOR_SIZE 512
@@ -25,9 +25,10 @@ enum oflags{
 struct path_search_record{// 搜索的路径记录
 	char searched_path[MAX_PATH_LEN]; //已经查找过的路径 比如 /a/b/c/d  如果我们当前正在查找c，那么不论c是否查找到 应该更新为/a/b/c
 	struct dir* parent_dir;           //总是指向已查找目录的倒数第二级，如果当前的已查找路径是/a/b/c，那么是b的dir*
-	uint8_t file_type;        //file_type已查找目录的最后一级的文件类型，没找到是FT_UNKNOW
+	enum file_types file_type;        //file_type已查找目录的最后一级的文件类型，没找到是FT_UNKNOW
 };
 int32_t path_depth_cnt(char* pathname);
 void filesys_init();
 int32_t sys_open(const char* pathname,uint8_t flags);
+int32_t sys_close(uint32_t local_fd);
 #endif

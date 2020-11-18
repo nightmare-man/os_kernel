@@ -10,6 +10,7 @@
 #include "../device/ide.h"
 #include "../lib/kernel/list.h"
 #include "./file.h"
+#include "../thread/thread.h"
 extern uint8_t channel_cnt;//在ide.c中定义 在ide_init里初始化
 extern struct ide_channel channels[2];//同样
 struct partition*cur_part;//记录当前所选用的分区 ，由mout_parttion负责切换
@@ -378,13 +379,31 @@ int32_t sys_open(const char* pathname,uint8_t flags){
 		return -1;
 	}
 	switch(flags&O_CREAT){
-		case O_CREAT:
+		case O_CREAT://
 			printfk("creating file\n");
 			fd=file_create(searched_record.parent_dir,(strrchr(pathname,'/')+1),flags);
 			dir_close(searched_record.parent_dir);
+			break;
+		default: //其余情况均需要打开文件
+			fd=file_open(inode_no,flags);//先打开文件
 	
 	}
 	printfk("cur_part is %s ,data block start is 0x%x\n",cur_part->name,cur_part->sb->data_start_lba);
 	return fd;//返回本地文件描述符  此fd是任务tcb->fd_table数组中元素的下标
 
+}
+static uint32_t fd_local2global(uint32_t local_fd){
+	struct task_struct *cur=running_thread();
+	uint32_t global_fd=cur->fd_table[local_fd];
+	ASSERT(global_fd>0 && global_fd<MAX_FILE_OPEN);
+	return global_fd;
+}
+int32_t sys_close(uint32_t local_fd){
+	int32_t ret=-1;
+	if(local_fd>2){
+		int32_t gloabl_fd=fd_local2global(local_fd);
+		ret=file_close(&file_table[gloabl_fd]);
+		running_thread()->fd_table[local_fd]=-1;//释放pcb中对fd_table的占用;
+	}
+	return ret;
 }

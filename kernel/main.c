@@ -62,8 +62,13 @@ int main(){
 	//thread_start("thread2",31,func2,"t2 ");
 	// process_execute(u_prog_a,"user_prog_a");
 	// process_execute(u_prog_b,"user_prog_b");
-	sys_open("/file1",O_CREAT);
 	intr_enable();	//intr_enable必须在init_all之后调用，因为init_all里的初始化函数使用了put_str 这个时候不允许多线程
+	
+	int32_t fd=sys_open("/file1",O_RDWR);
+	printfk("fd is :0x%x\n",fd);
+	printfk("fd_table[0x%x] is 0x%x",fd,running_thread()->fd_table[fd]);
+	sys_close(fd);
+	printfk("after close fd_table[0x%x] is 0x%x",fd,running_thread()->fd_table[fd]);
 	
 	//thread_yeild();
 	//*((int*)0xc010200c)=10;// 我惊讶的发现 即使0xc010200c对应的页表项的p位置0，仍然可以访问，可能是因为我没有写page fault中断？

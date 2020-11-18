@@ -7,7 +7,7 @@
 #include "../thread/thread.h"
 #include "../device/ide.h"
 #include "../lib/string.h"
-
+#include "../lib/kernel/interrupt.h"
 struct file file_table[MAX_FILE_OPEN];//所有进程线程共用的文件结构表
 extern struct partition*cur_part;
 //inode 是文件数据描述符
@@ -40,7 +40,7 @@ int32_t pcb_fd_install(int32_t global_fd_idx){
 	uint8_t local_fd_idx=3;
 	while(local_fd_idx<MAX_FILES_OPEN_PER_PROC){
 		if(cur->fd_table[local_fd_idx]==-1){//-1表示空闲
-			cur->fd_table[local_fd_idx]==global_fd_idx;//安装
+			cur->fd_table[local_fd_idx]=global_fd_idx;//安装
 			break;
 		}
 		local_fd_idx++;
@@ -49,6 +49,7 @@ int32_t pcb_fd_install(int32_t global_fd_idx){
 		printfk("exceed max open files per progress\n");
 		return -1;
 	}
+
 	return local_fd_idx;
 }
 
@@ -168,3 +169,44 @@ rollback:
 	sys_free(io_buf);
 	return -1;
 }
+
+int32_t file_open(uint32_t inode_no,uint8_t flag){
+	int fd_idx=get_free_slot_in_global();
+	if(fd_idx==-1){
+		printfk("exceed max open files!\n");
+		return -1;
+	}
+	file_table[fd_idx].fd_inodes=inode_open(cur_part,inode_no);
+	file_table[fd_idx].fd_flag=flag;
+	file_table[fd_idx].fd_pos=0;//每次打开文件 初始化偏移为0
+	bool*write_deny=&file_table[fd_idx].fd_inodes->write_deny;//用指针是为了修改
+	if(flag &O_RDWR||flag & O_RONLY){
+		//如果是写文件 判断是否有其他进程正在写此文件
+		//为了互斥 关闭中断后再访问
+		enum intr_status old=intr_disable();
+		if(*write_deny==false){//如果不是关中断 防止互斥下判断，那就没意义，比如if的时候满足跳进，刚执行完if后被换下，其他线程写这个文件，*write_deny
+		//实际上是true了，两个线程都在试图写
+			*write_deny=true;//置为true 以后其他线程在此线程没释放之前，就不能写这个文件了
+			intr_set_status(old);
+		}else{
+			intr_set_status(old);
+			printfk("file can't be written now!\n");
+			return -1;
+		}
+
+
+	}
+	
+	return pcb_fd_install(fd_idx);//从全局file_table中安装到pcb的文件描述符表，返回下标
+}
+uint32_t file_close(struct file*file){
+	if(file==NULL){
+		return -1;
+	}
+	file->fd_inodes->write_deny=false;//释放写占用
+	inode_close(file->fd_inodes);//关闭inodes
+	file->fd_inodes=NULL;//释放file_table中的占用
+	return 0;	
+}
+
+
