@@ -208,5 +208,177 @@ uint32_t file_close(struct file*file){
 	file->fd_inodes=NULL;//释放file_table中的占用
 	return 0;	
 }
+int32_t file_write(struct file*file,const void *buf,uint32_t count ){
+	if(file->fd_inodes->i_size+count>BLOCK_SIZE*140){//如果超过了最大值
+		printfk("exceed max file_size 71680 bytes,write file failed\n");
+		return -1;
+	}
+	//作者又又又来bug了，这里原文分配的是512 而我分配的是1024
+	uint8_t *io_buf=(uint8_t*)sys_malloc(BLOCK_SIZE*2);//为什么是1024而不是512？因为后面要调用inode_sync传给它，需要1024字节的buf
+	if(io_buf==NULL){
+		printfk("[file.c]file_write malloc memory fail!\n");
+		return -1;
+	}
+	uint32_t* all_blocks=(uint32_t*)sys_malloc(140*sizeof(uint32_t));
+	if(all_blocks==NULL){
+		printfk("[file.c]file_write malloc memory fail\n");
+		return -1;
+	}
+	const uint8_t* src=buf;
+	uint32_t bytes_written=0;//已经写入的字节
+	uint32_t size_left=count;//剩余的字节
+	uint32_t block_lba=-1;
+	uint32_t block_bitmap_idx=0;
+
+	uint32_t sec_idx;
+	uint32_t sec_lba;
+	uint32_t sec_off_bytes;//扇区内字节的偏移量
+	uint32_t sec_left_bytes;
+	uint32_t chunk_size;//每次写入硬盘的数据块大小
+	int32_t indirect_block_table;//间接表的地址lba
+	uint32_t block_idx;
+	if(file->fd_inodes->i_blocks[0]==0){//文件全空
+		block_lba=block_bitmap_alloc(cur_part);
+		if(block_lba==-1){
+			printfk("[file.c]file_write malloc block fail\n");
+			return -1;
+		}
+		file->fd_inodes->i_blocks[0]=block_lba;
+		block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
+		ASSERT(block_bitmap_idx!=0);
+		bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);//立刻同步到磁盘
+
+	}
+	uint32_t file_has_used_blocks=DIV_ROUND_UP(file->fd_inodes->i_size,BLOCK_SIZE);
+	uint32_t file_will_use_blocks=DIV_ROUND_UP((file->fd_inodes->i_size+count),BLOCK_SIZE);
+	ASSERT(file_will_use_blocks<=140);
+
+	uint32_t add_blocks=file_will_use_blocks-file_has_used_blocks;
+
+	//以下将所有要操作的block的lba地址写入 all_blocks
+	//更新了文件的inode，最后要inode_sync
+	//对于间接块 还要写到间接地址表里(硬盘上)
+	
+	if(add_blocks==0){//块够用，不需要增加新的数据块,写到已有的最后一块
+		if(file_will_use_blocks<=12){//待写入数据在直接块
+			block_idx=file_will_use_blocks-1;
+			all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
+		}else{
+			ASSERT(file->fd_inodes->i_blocks[12]!=0);
+			indirect_block_table=file->fd_inodes->i_blocks[12];
+			ide_read(cur_part->belong_to,indirect_block_table,all_blocks+12,1);//将间接块的地址读到all_blocks对应位置
+		}
+	}else{//需要增加新的数据块，（但是我们仍然要注意已有块的最后一块，可能有空余空间，为了保险起见，我们把这一块的地址也放入all_blocks）
+		if(file_will_use_blocks<=12){//还是用直接块
+			block_idx=file_has_used_blocks-1;
+			all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
+
+			block_idx++;
+			while(block_idx<file_will_use_blocks){
+				block_lba=block_bitmap_alloc(cur_part);
+				if(block_lba==-1){
+					
+					printfk("[file.c]file_write malloc block fail,situation 1\n");
+					return -1;
+					
+				}
+				ASSERT(file->fd_inodes->i_blocks[block_idx]==0);//如果不为0，说明有该块已经被分配，但是未被使用，这是不允许的
+				file->fd_inodes->i_blocks[block_idx]=all_blocks[block_idx]=block_lba;
+				block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
+				bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
+				block_idx++;
+			}
+
+		}else if(file_has_used_blocks<=12&&file_will_use_blocks>12){//原来是直接块，现在需要使用间接块
+			block_idx=file_has_used_blocks-1;
+			all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];//记录最后一个块
+			
+
+			//分配间接表的块
+			block_lba=block_bitmap_alloc(cur_part);
+			if(block_lba==-1){
+				printfk("[file.c]file_write malloc block fail,situation 2\n");
+				return -1;
+			}
+			ASSERT(file->fd_inodes->i_blocks[12]==0);//没有间接表
+			indirect_block_table=file->fd_inodes->i_blocks[12]=block_lba;
+			block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
+			//作者这里掉了一个bitmap_sync，我给补上了 bug+1
+			bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
+
+			block_idx=file_has_used_blocks;//第一个待分配块的索引
+			while(block_idx<file_will_use_blocks){
+				block_lba=block_bitmap_alloc(cur_part);
+				if(block_lba==-1){
+					printfk("[file.c]file_write malloc block fail,situation 2\n");
+					return -1;
+				}
+				if(block_idx<12){
+					ASSERT(file->fd_inodes->i_blocks[block_idx]==0);//确保之前没有分配
+					file->fd_inodes->i_blocks[block_idx]=all_blocks[block_idx]=block_lba;
+				}else{
+					//要写到间接地址表的块中，我们先写到all_blocks中 然后一起ide_write到间接地址表的块里
+					all_blocks[block_idx]=block_lba;
+				}
+				block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
+				bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
+				block_idx++;
+			}
+			ide_write(cur_part->belong_to,indirect_block_table,all_blocks+12,1);//同步间接地址表块
+		}else if(file_has_used_blocks>12){
+			//原本就已经用到了间接块
+			ASSERT(file->fd_inodes->i_blocks[12]!=0);
+			indirect_block_table=file->fd_inodes->i_blocks[12];
+			ide_read(cur_part->belong_to,indirect_block_table,all_blocks+12);//读入间接地址表的 地址项
+
+			block_idx=file_has_used_blocks;//待分配的第一个块的索引
+			while(block_idx<file_will_use_blocks){
+				block_lba=block_bitmap_alloc(cur_part);
+				if(block_lba==-1){
+					printfk("[file.c]file_write malloc block fali,situation 3\n");
+					return -1;
+				}
+				all_blocks[block_idx]=block_lba;
+				block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
+				bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
+				block_idx++;
+			}
+			ide_write(cur_part->belong_to,indirect_block_table,all_blocks+12,1);//同步间接地址表
+		}
+	}
+	//至此 所有待操作的数据块的lba都按照他们对应的索引放在 all_blocks中了， 上面的情况3比较特别，把所有间接地址块都读入了，而其他的情况都是记录从
+	//已经占用的最后一个（可能有剩余空间的那个），到分配的块的最后一个
+	
+	bool has_remain_space=true;//该块是不是还有剩余空间
+	file->fd_pos=file->fd_inodes->i_size-1;//文件指针默认为末尾
+	while(bytes_written<count){//逐个扇区/块写入
+
+		
+		memset(io_buf,0,BLOCK_SIZE);
+		sec_idx=file->fd_inodes->i_size/BLOCK_SIZE;//文件末尾所在的块的索引，我们每次都往末尾写，但是除了第一次 末尾块可能需要同步外，其余都是直接写
+		//因为其余块都是我们分配的
+		sec_lba=all_blocks[sec_idx];//对应的lba
+		sec_off_bytes=file->fd_inodes->i_size%BLOCK_SIZE;//第一个空闲字节在最后一个已经使用的块内的索引
+		sec_left_bytes=BLOCK_SIZE-sec_off_bytes;//最后一个已经使用的块还剩的空间
+		
+		chunk_size=size_left<sec_left_bytes?size_left:sec_left_bytes;//判断此次对该块需要写入多少数据（如果剩余写入不足还能够写入的，就剩余，反之就能够）
+		if(has_remain_space){//除了第一次写入数据，需要同步原扇区数据到io_buf,其余都是对新分配的扇区的写入，不需要同步
+			ide_read(cur_part->belong_to,sec_lba,io_buf,1);
+			has_remain_space=false;
+		}
+		memcpy(io_buf+sec_off_bytes,src,chunk_size);	
+		ide_write(cur_part->belong_to,sec_lba,io_buf,1);//写入数据
+		src+=chunk_size;
+		file->fd_inodes->i_size+=chunk_size;
+		file->fd_pos+=chunk_size;
+		bytes_written+=chunk_size;
+		size_left-=chunk_size;	
+	}
+	memset(io_buf,0,BLOCK_SIZE);
+	inode_sync(cur_part,file->fd_inodes,io_buf);
+	sys_free(all_blocks);
+	sys_free(io_buf);
+	return bytes_written;
+}
 
 
