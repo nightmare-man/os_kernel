@@ -375,7 +375,6 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 	inode_sync(cur_part,file->fd_inodes,io_buf);
 	sys_free(all_blocks);
 	sys_free(io_buf);
-	printfk("file->inode start0x %x,no:0x%x, block[0] lba:0x%x\n",cur_part->sb->inode_table_lba,file->fd_inodes->i_no,file->fd_inodes->i_blocks[0]);
 	return bytes_written;
 }
 

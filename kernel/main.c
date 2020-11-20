@@ -72,7 +72,8 @@ int main(){
 	printfk("now close\n");
 	
 	//thread_yeild();
-	//*((int*)0xc010200c)=10;// 我惊讶的发现 即使0xc010200c对应的页表项的p位置0，仍然可以访问，可能是因为我没有写page fault中断？
+	//关于page fault 如果pde存在 pde p位置0，还是可以读写(先malloc 再free bochs里查看过对应的page信息，显示物理地址不可用)
+	//但是如果之前没有malloc过直接访问就pf，根据结果猜测是pde没有就pf，pte没有不pf
 	
     while(1){
 		
