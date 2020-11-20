@@ -66,9 +66,10 @@ int main(){
 	
 	int32_t fd=sys_open("/file1",O_RDWR);
 	printfk("fd is :0x%x\n",fd);
-	printfk("fd_table[0x%x] is 0x%x",fd,running_thread()->fd_table[fd]);
+	sys_write(fd,"hello,world\n",11);
+	
 	sys_close(fd);
-	printfk("after close fd_table[0x%x] is 0x%x",fd,running_thread()->fd_table[fd]);
+	printfk("now close\n");
 	
 	//thread_yeild();
 	//*((int*)0xc010200c)=10;// 我惊讶的发现 即使0xc010200c对应的页表项的p位置0，仍然可以访问，可能是因为我没有写page fault中断？

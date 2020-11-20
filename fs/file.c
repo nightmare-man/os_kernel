@@ -265,7 +265,7 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 			block_idx=file->fd_inodes->i_size/BLOCK_SIZE;//第一个待写入的块的索引
 
 			while(block_idx<file_will_use_blocks){
-				if(file->fd_inodes[block_idx]){
+				if(file->fd_inodes->i_blocks[block_idx]){
 					all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
 				}else{
 					block_lba=block_bitmap_alloc(cur_part);
@@ -296,7 +296,7 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 			block_idx=file->fd_inodes->i_size/BLOCK_SIZE;//第一个待写入的块的索引
 			while(block_idx<file_will_use_blocks){
 				if(block_idx<12){
-					if(file->fd_inodes[block_idx]){
+					if(file->fd_inodes->i_blocks[block_idx]){
 						all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
 					}else{
 						block_lba=block_bitmap_alloc(cur_part);
@@ -324,7 +324,7 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 			//原本就已经用到了间接块
 			ASSERT(file->fd_inodes->i_blocks[12]!=0);
 			indirect_block_table=file->fd_inodes->i_blocks[12];
-			ide_read(cur_part->belong_to,indirect_block_table,all_blocks+12);//读入间接地址表的 地址项
+			ide_read(cur_part->belong_to,indirect_block_table,all_blocks+12,1);//读入间接地址表的 地址项
 
 			block_idx=file->fd_inodes->i_size/BLOCK_SIZE;//第一个待写入的块的索引
 			while(block_idx<file_will_use_blocks){
@@ -375,6 +375,7 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 	inode_sync(cur_part,file->fd_inodes,io_buf);
 	sys_free(all_blocks);
 	sys_free(io_buf);
+	printfk("file->inode start0x %x,no:0x%x, block[0] lba:0x%x\n",cur_part->sb->inode_table_lba,file->fd_inodes->i_no,file->fd_inodes->i_blocks[0]);
 	return bytes_written;
 }
 

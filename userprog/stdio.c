@@ -3,6 +3,7 @@
 #include "../lib/kernel/print.h"
 #include "../lib/string.h"
 #include "../lib/user/syscall.h"
+#include "../fs/file.h"
 
 
 //整数转字符串 buf_ptr_addr 是缓冲区的当前位置的指针的指针，用二级指针的原因是，使用了递归，递归过程中要修改递归外面的指针值，因此用
@@ -76,7 +77,7 @@ uint32_t printf(const char*format,...){
 	char buf[1024]={0};
 	vsprintf(buf,format,args);
 	va_end(args);
-	return write(buf);
+	return write(stdout_no,buf,strlen(buf));
 }
 
 //利用vsprintf 输出格式化字符串到 buf

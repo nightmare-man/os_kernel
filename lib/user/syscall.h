@@ -9,7 +9,7 @@ enum SYSCALL_NR{
 	SYS_REAED_DISK
 };
 uint32_t getpid(void);
-uint32_t write(char*str);
+uint32_t write(int32_t fd,const void*buf,uint32_t count);
 void* malloc(uint32_t size);
 void free(void* ptr);
 void syscall_init(void);

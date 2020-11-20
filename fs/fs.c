@@ -11,6 +11,7 @@
 #include "../lib/kernel/list.h"
 #include "./file.h"
 #include "../thread/thread.h"
+#include "../device/console.h"
 extern uint8_t channel_cnt;//在ide.c中定义 在ide_init里初始化
 extern struct ide_channel channels[2];//同样
 struct partition*cur_part;//记录当前所选用的分区 ，由mout_parttion负责切换
@@ -406,4 +407,25 @@ int32_t sys_close(uint32_t local_fd){
 		running_thread()->fd_table[local_fd]=-1;//释放pcb中对fd_table的占用;
 	}
 	return ret;
+}
+int32_t sys_write(int32_t fd,const void* buf,uint32_t count){
+	if(fd<0){
+		printfk("[fs.c]sys_write fd error\n");
+		return -1;
+	}
+	if(fd==stdout_no){
+		char temp_buf[1024]={0};
+		memcpy(temp_buf,buf,count);
+		console_put_str(temp_buf);//没有再使用printfk 提高效率？？？ //ok我知道了 因为printf以及printfk都是调用的write（旧版），而write用的sys_write
+		return count;             //防止循环调用 但是printfk直接用的是console_put_str 实际上旧版的sys_write也是console_put_str
+	}
+	uint32_t _fd=fd_local2global(fd);
+	struct file* wr_file=&file_table[_fd];
+	if(wr_file->fd_flag&O_WONLY||wr_file->fd_flag&O_RDWR){//权限检查 inode->write_deny是打开文件时检查，而这个是写入文件是检查
+		uint32_t byte_written=file_write(wr_file,buf,count);
+		return byte_written;
+	}else{
+		console_put_str("[fs.c]sys_write:not allowed to write file without flag O_WRONLY or O_RDWR\n");
+		return -1;
+	}
 }
