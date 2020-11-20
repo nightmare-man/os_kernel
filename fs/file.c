@@ -237,20 +237,12 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 	uint32_t chunk_size;//每次写入硬盘的数据块大小
 	int32_t indirect_block_table;//间接表的地址lba
 	uint32_t block_idx;
-	if(file->fd_inodes->i_blocks[0]==0){//文件全空
-		block_lba=block_bitmap_alloc(cur_part);
-		if(block_lba==-1){
-			printfk("[file.c]file_write malloc block fail\n");
-			return -1;
-		}
-		file->fd_inodes->i_blocks[0]=block_lba;
-		block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
-		ASSERT(block_bitmap_idx!=0);
-		bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);//立刻同步到磁盘
 
-	}
-	uint32_t file_has_used_blocks=DIV_ROUND_UP(file->fd_inodes->i_size,BLOCK_SIZE);
-	uint32_t file_will_use_blocks=DIV_ROUND_UP((file->fd_inodes->i_size+count),BLOCK_SIZE);
+
+	
+
+	uint32_t file_has_used_blocks=DIV_ROUND_UP( (file->fd_inodes->i_size),BLOCK_SIZE   );//原来占用的扇区数
+	uint32_t file_will_use_blocks=DIV_ROUND_UP((file->fd_inodes->i_size+count),BLOCK_SIZE);//将占用的扇区数
 	ASSERT(file_will_use_blocks<=140);
 
 	uint32_t add_blocks=file_will_use_blocks-file_has_used_blocks;
@@ -261,7 +253,7 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 	
 	if(add_blocks==0){//块够用，不需要增加新的数据块,写到已有的最后一块
 		if(file_will_use_blocks<=12){//待写入数据在直接块
-			block_idx=file_will_use_blocks-1;
+			block_idx=file->fd_inodes->i_size/BLOCK_SIZE;//第一个待写入的块的索引
 			all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
 		}else{
 			ASSERT(file->fd_inodes->i_blocks[12]!=0);
@@ -270,30 +262,25 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 		}
 	}else{//需要增加新的数据块，（但是我们仍然要注意已有块的最后一块，可能有空余空间，为了保险起见，我们把这一块的地址也放入all_blocks）
 		if(file_will_use_blocks<=12){//还是用直接块
-			block_idx=file_has_used_blocks-1;
-			all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
+			block_idx=file->fd_inodes->i_size/BLOCK_SIZE;//第一个待写入的块的索引
 
-			block_idx++;
 			while(block_idx<file_will_use_blocks){
-				block_lba=block_bitmap_alloc(cur_part);
-				if(block_lba==-1){
-					
-					printfk("[file.c]file_write malloc block fail,situation 1\n");
-					return -1;
-					
+				if(file->fd_inodes[block_idx]){
+					all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
+				}else{
+					block_lba=block_bitmap_alloc(cur_part);
+					if(block_lba==-1){
+						printfk("[file.c]file_write malloc block fail,situation 1\n");
+						return -1;
+					}
+					file->fd_inodes->i_blocks[block_idx]=all_blocks[block_idx]=block_lba;
+					block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
+					bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
 				}
-				ASSERT(file->fd_inodes->i_blocks[block_idx]==0);//如果不为0，说明有该块已经被分配，但是未被使用，这是不允许的
-				file->fd_inodes->i_blocks[block_idx]=all_blocks[block_idx]=block_lba;
-				block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
-				bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
 				block_idx++;
 			}
 
 		}else if(file_has_used_blocks<=12&&file_will_use_blocks>12){//原来是直接块，现在需要使用间接块
-			block_idx=file_has_used_blocks-1;
-			all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];//记录最后一个块
-			
-
 			//分配间接表的块
 			block_lba=block_bitmap_alloc(cur_part);
 			if(block_lba==-1){
@@ -306,17 +293,25 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 			//作者这里掉了一个bitmap_sync，我给补上了 bug+1
 			bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
 
-			block_idx=file_has_used_blocks;//第一个待分配块的索引
+			block_idx=file->fd_inodes->i_size/BLOCK_SIZE;//第一个待写入的块的索引
 			while(block_idx<file_will_use_blocks){
-				block_lba=block_bitmap_alloc(cur_part);
-				if(block_lba==-1){
-					printfk("[file.c]file_write malloc block fail,situation 2\n");
-					return -1;
-				}
 				if(block_idx<12){
-					ASSERT(file->fd_inodes->i_blocks[block_idx]==0);//确保之前没有分配
-					file->fd_inodes->i_blocks[block_idx]=all_blocks[block_idx]=block_lba;
+					if(file->fd_inodes[block_idx]){
+						all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
+					}else{
+						block_lba=block_bitmap_alloc(cur_part);
+						if(block_lba==-1){
+							printfk("[file.c]file_write malloc block fail,situation 1\n");
+							return -1;
+						}
+						file->fd_inodes->i_blocks[block_idx]=all_blocks[block_idx]=block_lba;
+					}
 				}else{
+					block_lba=block_bitmap_alloc(cur_part);
+					if(block_lba==-1){
+						printfk("[file.c]file_write malloc block fail,situation 1\n");
+						return -1;
+					}
 					//要写到间接地址表的块中，我们先写到all_blocks中 然后一起ide_write到间接地址表的块里
 					all_blocks[block_idx]=block_lba;
 				}
@@ -331,16 +326,18 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 			indirect_block_table=file->fd_inodes->i_blocks[12];
 			ide_read(cur_part->belong_to,indirect_block_table,all_blocks+12);//读入间接地址表的 地址项
 
-			block_idx=file_has_used_blocks;//待分配的第一个块的索引
+			block_idx=file->fd_inodes->i_size/BLOCK_SIZE;//第一个待写入的块的索引
 			while(block_idx<file_will_use_blocks){
-				block_lba=block_bitmap_alloc(cur_part);
-				if(block_lba==-1){
-					printfk("[file.c]file_write malloc block fali,situation 3\n");
-					return -1;
+				if(all_blocks[block_idx]==0){
+					block_lba=block_bitmap_alloc(cur_part);
+					if(block_lba==-1){
+						printfk("[file.c]file_write malloc block fali,situation 3\n");
+						return -1;
+					}
+					all_blocks[block_idx]=block_lba;
+					block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
+					bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
 				}
-				all_blocks[block_idx]=block_lba;
-				block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
-				bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
 				block_idx++;
 			}
 			ide_write(cur_part->belong_to,indirect_block_table,all_blocks+12,1);//同步间接地址表
