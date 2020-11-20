@@ -393,7 +393,7 @@ int32_t sys_open(const char* pathname,uint8_t flags){
 	return fd;//返回本地文件描述符  此fd是任务tcb->fd_table数组中元素的下标
 
 }
-static uint32_t fd_local2global(uint32_t local_fd){
+uint32_t fd_local2global(uint32_t local_fd){
 	struct task_struct *cur=running_thread();
 	uint32_t global_fd=cur->fd_table[local_fd];
 	ASSERT(global_fd>0 && global_fd<MAX_FILE_OPEN);
@@ -408,7 +408,7 @@ int32_t sys_close(uint32_t local_fd){
 	}
 	return ret;
 }
-int32_t sys_write(int32_t fd,const void* buf,uint32_t count){
+int32_t sys_write(int32_t fd,const void* buf,uint32_t count){//传入的是 文件描述符 而不是全局的file*偏移
 	if(fd<0){
 		printfk("[fs.c]sys_write fd error\n");
 		return -1;
@@ -419,7 +419,7 @@ int32_t sys_write(int32_t fd,const void* buf,uint32_t count){
 		console_put_str(temp_buf);//没有再使用printfk 提高效率？？？ //ok我知道了 因为printf以及printfk都是调用的write（旧版），而write用的sys_write
 		return count;             //防止循环调用 但是printfk直接用的是console_put_str 实际上旧版的sys_write也是console_put_str
 	}
-	uint32_t _fd=fd_local2global(fd);
+	uint32_t _fd=fd_local2global(fd);//
 	struct file* wr_file=&file_table[_fd];
 	if(wr_file->fd_flag&O_WONLY||wr_file->fd_flag&O_RDWR){//权限检查 inode->write_deny是打开文件时检查，而这个是写入文件是检查
 		uint32_t byte_written=file_write(wr_file,buf,count);
@@ -428,4 +428,17 @@ int32_t sys_write(int32_t fd,const void* buf,uint32_t count){
 		console_put_str("[fs.c]sys_write:not allowed to write file without flag O_WRONLY or O_RDWR\n");
 		return -1;
 	}
+}
+int32_t sys_read(int32_t fd,void* buf,uint32_t count){
+	if(fd<0){
+		printfk("[fs.c]sys_read fd can't be negative\n");
+		return -1;
+	}
+	uint32_t _fd=fd_local2global(fd);
+	struct file*r_file=&file_table[_fd];
+	if(r_file->fd_flag&O_WONLY){
+		printfk("[fs.c]sys_read:not allowed to read file with flag O_WRONLY\n");
+		return -1;
+	}
+	return file_read(r_file,buf,count);
 }

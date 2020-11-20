@@ -347,7 +347,7 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 	//已经占用的最后一个（可能有剩余空间的那个），到分配的块的最后一个
 	
 	bool has_remain_space=true;//该块是不是还有剩余空间
-	file->fd_pos=file->fd_inodes->i_size-1;//文件指针默认为末尾
+	file->fd_pos=file->fd_inodes->i_size;//在写时应该指向待写入字节（最后一个字节的下一个字节）
 	while(bytes_written<count){//逐个扇区/块写入
 
 		
@@ -378,4 +378,83 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 	return bytes_written;
 }
 
+int32_t file_read(struct file*file,void*buf,uint32_t count){
+	uint8_t* buf_dst=(uint8_t*)buf;
+	uint32_t size=count,size_left=size;
+	if(file->fd_pos+count>file->fd_inodes->i_size){
+		size=file->fd_inodes->i_size-file->fd_pos;//待读的第一个字节的索引 fd_pos
+		size_left=size;
+		if(size==0){
+			return -1;
+		}
+	}
+	uint8_t* io_buf=sys_malloc(BLOCK_SIZE);
+	if(io_buf==NULL){
+		printfk("[file.c]file_read malloc memory fail\n");
+		return -1;
+	}
+	uint32_t*all_blocks=(uint32_t*)sys_malloc(140*sizeof(uint32_t));
+	if(all_blocks==NULL){
+		printfk("[file.c]file_read malloc memory fail\n");
+		return -1;
+	}
+	uint32_t block_read_start_idx=file->fd_pos/BLOCK_SIZE;//都是索引
+	uint32_t block_read_end_idx=(file->fd_pos+size)/BLOCK_SIZE;
 
+
+	uint32_t read_blocks=block_read_end_idx-block_read_start_idx;
+	ASSERT(block_read_start_idx<=139&&block_read_end_idx<=139);
+	int32_t indirect_block_table;
+	uint32_t block_idx;
+	
+	if(read_blocks==0){//同一扇区内部读
+		if(block_read_end_idx<12){
+			block_idx=block_read_end_idx;
+			all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
+		}else{
+			indirect_block_table=file->fd_inodes->i_blocks[12];
+			ide_read(cur_part->belong_to,indirect_block_table,all_blocks+12,1);//间接块 地址都读入了
+		}
+	}else{//读多个块
+		if(block_read_end_idx<12){//都在直接块
+			block_idx=block_read_start_idx;
+			while(block_idx<=block_read_end_idx){
+				all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
+				block_idx++;
+			}
+		}else if(block_read_start_idx<12&&block_read_end_idx>=12){
+			block_idx=block_read_start_idx;
+			while(block_idx<12){
+				all_blocks[block_idx]=file->fd_inodes->i_blocks[block_idx];
+				block_idx++;
+			}
+			indirect_block_table=file->fd_inodes->i_blocks[12];
+			ASSERT(indirect_block_table);
+			ide_read(cur_part->belong_to,indirect_block_table,all_blocks+12,1);//读入间接块地址
+		}else if(block_read_start_idx>=12){
+			indirect_block_table=file->fd_inodes->i_blocks[12];
+			ASSERT(indirect_block_table);
+			ide_read(cur_part->belong_to,indirect_block_table,all_blocks+12,1);
+		}
+	}
+	//至此 所有待读的连续块的地址都在all_blocks按照索引排列好了
+	uint32_t sec_lba,sec_idx,sec_off_bytes,sec_left_bytes,chunk_size;
+	uint32_t read_bytes=0;
+	while(read_bytes<size){//每次读一个扇区 然后往buf里复制，除第一个扇区buf复制的偏移不为0，其余均完整赋值
+		sec_idx=file->fd_pos/BLOCK_SIZE;
+		sec_lba=all_blocks[sec_idx];
+		sec_off_bytes=file->fd_pos%BLOCK_SIZE;
+		sec_left_bytes=BLOCK_SIZE-sec_off_bytes;//此扇区读的字节中需要的部分
+		chunk_size=size_left<sec_left_bytes?size_left:sec_left_bytes;
+		memset(io_buf,0,BLOCK_SIZE);
+		ide_read(cur_part->belong_to,sec_lba,io_buf,1);
+		memcpy(buf_dst,io_buf+sec_off_bytes,chunk_size);
+		buf_dst+=chunk_size;
+		file->fd_pos+=chunk_size;
+		read_bytes+=chunk_size;
+		size_left-=chunk_size;
+	}
+	sys_free(all_blocks);
+	sys_free(io_buf);
+	return read_bytes;
+}
