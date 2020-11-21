@@ -27,6 +27,11 @@ struct path_search_record{// 搜索的路径记录
 	struct dir* parent_dir;           //总是指向已查找目录的倒数第二级，如果当前的已查找路径是/a/b/c，那么是b的dir*
 	enum file_types file_type;        //file_type已查找目录的最后一级的文件类型，没找到是FT_UNKNOW
 };
+enum whence{
+	SEEK_SET=1,
+	SEEK_CUR,
+	SEEK_END
+};
 int32_t path_depth_cnt(char* pathname);
 void filesys_init();
 int32_t sys_open(const char* pathname,uint8_t flags);
@@ -34,4 +39,5 @@ int32_t sys_close(uint32_t local_fd);
 int32_t sys_write(int32_t fd,const void* buf,uint32_t count);
 int32_t sys_read(int32_t fd,void* buf,uint32_t count);
 uint32_t fd_local2global(uint32_t local_fd);
+int32_t sys_lseek(int32_t fd,int32_t offset,uint8_t whence);
 #endif

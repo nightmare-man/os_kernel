@@ -442,3 +442,32 @@ int32_t sys_read(int32_t fd,void* buf,uint32_t count){
 	}
 	return file_read(r_file,buf,count);
 }
+int32_t sys_lseek(int32_t fd,int32_t offset,uint8_t whence){
+	if(fd<0){
+		printfk("[fs.c]sys_lseek:fd error\n");
+		return -1;
+	}
+	ASSERT(whence>0&&whence<3);
+	uint32_t _fd=fd_local2global(fd);
+	struct file* pf=&file_table[_fd];
+	int32_t new_pos=0;
+	int32_t file_size=(int32_t)pf->fd_inodes->i_size;
+	switch (whence)
+	{
+	case SEEK_SET:
+		new_pos=offset;
+		break;
+	case SEEK_CUR:
+		new_pos=(int32_t)pf->fd_pos+offset;
+		break;
+	case SEEK_END:
+		new_pos=file_size+offset;
+		break;
+	}
+	if(new_pos<0||new_pos>(file_size-1)){//读一个文件 读完后pos能指向 file_size的索引，也就是最后以字节的下一个，
+											//但是设置时就不能，所以=file_size就fail了
+		return -1;
+	}
+	pf->fd_pos=new_pos;
+	return pf->fd_pos;
+}
