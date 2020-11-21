@@ -177,6 +177,7 @@ int32_t file_open(uint32_t inode_no,uint8_t flag){
 		return -1;
 	}
 	file_table[fd_idx].fd_inodes=inode_open(cur_part,inode_no);
+	printfk("this file,inode_no:0x%x|size:0x%x |block[0]:0x%x\n",inode_no,file_table[fd_idx].fd_inodes->i_size,file_table[fd_idx].fd_inodes->i_blocks[0]);
 	file_table[fd_idx].fd_flag=flag;
 	file_table[fd_idx].fd_pos=0;//每次打开文件 初始化偏移为0
 	bool*write_deny=&file_table[fd_idx].fd_inodes->write_deny;//用指针是为了修改
@@ -351,7 +352,7 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 	while(bytes_written<count){//逐个扇区/块写入
 
 		
-		memset(io_buf,0,BLOCK_SIZE);
+		memset(io_buf,0,BLOCK_SIZE);// 在分配新的数据块 扇区时，对io_buf清0 保证写入后只有我们想要的数据，而不会受磁盘原有数据影响
 		sec_idx=file->fd_inodes->i_size/BLOCK_SIZE;//文件末尾所在的块的索引，我们每次都往末尾写，但是除了第一次 末尾块可能需要同步外，其余都是直接写
 		//因为其余块都是我们分配的
 		sec_lba=all_blocks[sec_idx];//对应的lba

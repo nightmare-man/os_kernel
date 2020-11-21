@@ -278,6 +278,7 @@ int32_t path_depth_cnt(char* pathname){
 
 
 //搜索文件pathname,若找到则返回其inode号，否则返回-1
+//！！此函数会调用dir_open 打开parent_dir(也就是分配内存来记录相关信息) 要求主调函数调用后自行调用dir_close，不然会内存泄漏！！
 static int search_file(const char* pathname,struct path_search_record*searched_record){
 	//如果是查找根目录 直接返回
 	if( !strcmp(pathname,"/")  || !strcmp(pathname,"/.") || !strcmp(pathname,"/..")){
@@ -389,7 +390,11 @@ int32_t sys_open(const char* pathname,uint8_t flags){
 			fd=file_open(inode_no,flags);//先打开文件
 	
 	}
-	printfk("cur_part is %s ,data block start is 0x%x\n",cur_part->name,cur_part->sb->data_start_lba);
+	printfk("cur_part is %s ,data block start:0x%x\n",cur_part->name,cur_part->sb->data_start_lba);
+	printfk("inode_bitmap start:0x%x\n",cur_part->sb->inode_bitmap_lba);
+	printfk("block_bitmap start:0x%x\n",cur_part->sb->block_bitmap_lba);
+	printfk("inode_table start:0x%x   inode size:0x%x\n",cur_part->sb->inode_table_lba,sizeof(struct inode));
+	
 	return fd;//返回本地文件描述符  此fd是任务tcb->fd_table数组中元素的下标
 
 }
@@ -470,4 +475,50 @@ int32_t sys_lseek(int32_t fd,int32_t offset,uint8_t whence){
 	}
 	pf->fd_pos=new_pos;
 	return pf->fd_pos;
+}
+
+//以下函数删除文件 非目录
+int32_t sys_unlink(const char* pathname){
+	ASSERT(strlen(pathname)<MAX_PATH_LEN);
+	struct path_search_record searched_record;
+	memset(&searched_record,0,sizeof(searched_record));
+	int inode_no=search_file(pathname,&searched_record);
+	ASSERT(inode_no!=0);//当然不会是根目录的inode_no啦
+	if(inode_no==-1){
+		printfk("file %s not found!\n",pathname);
+		dir_close(searched_record.parent_dir);
+		return -1;
+	}
+	if(searched_record.file_type==FT_DIRECTORY){
+		printfk("can't delete a directory with unlink(),use rmdir() to instead\n");
+		dir_close(searched_record.parent_dir);
+		return -1;
+	}
+
+	//检查是不是在使用中 （也就是在pcb 中fd_table 全局 file_table inode_open队列中，只有sys_close后才可以删除）
+	uint32_t file_idx=0;
+	while(file_idx<MAX_FILE_OPEN){
+		if( file_table[file_idx].fd_inodes!=NULL && (uint32_t)inode_no==file_table[file_idx].fd_inodes->i_no ){
+			break;//找到了
+		}
+		file_idx++;
+	}
+	if(file_idx<MAX_FILE_OPEN){
+		printfk("file %s is in use,not allow to delete!\n",pathname);
+		dir_close(searched_record.parent_dir);
+		return -1;
+	}
+	
+	void*io_buf=sys_malloc(SECTOR_SIZE*2);
+	if(io_buf==NULL){
+		printfk("[fs.c]sys_unlink:malloc memory fail\n");
+		dir_close(searched_record.parent_dir);
+		return -1;
+	}
+	struct dir* parent_dir=searched_record.parent_dir;
+	delete_dir_entry(cur_part,parent_dir,inode_no,io_buf);//先删除父目录中对应的目录项
+	inode_release(cur_part,inode_no);
+	sys_free(io_buf);
+	dir_close(searched_record.parent_dir);
+	return 0;
 }

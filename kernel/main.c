@@ -68,20 +68,12 @@ int main(){
 	
 
 	//以下代码测试 sys_write sys_read 经测试均正常工作
+	int i;
+	int fd;
+	char name[12]={0};
+	char mes[16]={0};
 	
-	int32_t fd=sys_open("/file6",O_RDWR);
-	
-	
-	char buf[64]={0};
-	sys_read(fd,buf,5);
-	printfk("--content1---\n%s\n",buf);
-	sys_read(fd,buf,5);
-	printfk("--content2---\n%s\n",buf);
-	sys_lseek(fd,1,SEEK_SET);
-	sys_read(fd,buf,5);
-	printfk("--content3---\n%s\n",buf);
-	sys_close(fd);
-	printfk("now close\n");
+	printfk("delete %s\n",sys_unlink("/file20")!=-1?"done":"false");
 	
 	//thread_yeild();
 	//关于page fault 如果pde存在 pde p位置0，还是可以读写(先malloc 再free bochs里查看过对应的page信息，显示物理地址不可用)

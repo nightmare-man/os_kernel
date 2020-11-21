@@ -177,7 +177,7 @@ void inode_release(struct partition*part,uint32_t inode_no){
 	uint8_t block_idx=0,block_cnt=12;
 	uint32_t block_bitmap_idx;
 	uint32_t* all_blocks=(uint32_t*)sys_malloc(sizeof(uint32_t)*140);
-	memset(all_blocks,0,sizeof(uint32_t)*140)
+	memset(all_blocks,0,sizeof(uint32_t)*140);
 	while(block_idx<12){
 		all_blocks[block_idx]=to_release->i_blocks[block_idx];
 		block_idx++;
@@ -194,7 +194,7 @@ void inode_release(struct partition*part,uint32_t inode_no){
 	while(block_idx<block_cnt){
 		if(all_blocks[block_idx]){
 			block_bitmap_idx=all_blocks[block_idx]-part->sb->data_start_lba;
-			ASSERT(block_idx>0);//不能是0 对应根目录的数据 根目录无法释放
+			ASSERT(block_bitmap_idx>0);//不能是0 对应根目录的数据 根目录无法释放
 			bitmap_set(&part->block_bitmap,block_bitmap_idx,0);
 			bitmap_sync(part,block_bitmap_idx,BLOCK_BITMAP);
 		}
@@ -211,5 +211,6 @@ void inode_release(struct partition*part,uint32_t inode_no){
 	void*io_buf=sys_malloc(BLOCK_SIZE*2);
 	inode_delete(part,inode_no,io_buf);
 	sys_free(io_buf);
+	sys_free(all_blocks);
 	inode_close(to_release);//在part已经打开的inode队列中释放 
 }

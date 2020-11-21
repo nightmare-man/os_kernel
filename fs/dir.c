@@ -173,7 +173,7 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 				all_blocks[block_idx]=block_lba;
 				ide_write(cur_part->belong_to,dir_inode->i_blocks[12],all_blocks+12,1);
 			}
-			memset(io_buf,0,SECTOR_SIZE);
+			memset(io_buf,0,SECTOR_SIZE);  //分配一个扇区作为数据块，总是把io_buf先清0，保证写入后磁盘里只有我们想要的信息
 			memcpy(io_buf,p_de,dir_entry_size);
 			ide_write(cur_part->belong_to,all_blocks[block_idx],io_buf,1);
 			dir_inode->i_size+=dir_entry_size;
@@ -253,6 +253,7 @@ bool delete_dir_entry(struct partition*part,struct dir* pdir,uint32_t inode_no,v
 			}
 			ASSERT(dir_entry_cnt>0);
 			if(dir_entry_cnt==1 &&!is_dir_first_block){//如果除 . ..以外只有目标目录项一个，并且目录项还不和. .. 储存在一个扇区里，那就释放当前扇区
+				uint32_t block_bitmap_idx;
 				//先处理 inode->i_blocks 以及间接地址表	
 				//如果简介地址表也要释放 也需要释放其block_bitmap
 				if(block_idx<12){
@@ -268,7 +269,7 @@ bool delete_dir_entry(struct partition*part,struct dir* pdir,uint32_t inode_no,v
 					ASSERT(indirect_blocks>=1);
 					if(indirect_blocks>1){//还有其他间接块 不释放间接地址表 只释放块
 						all_blocks[block_idx]=0;
-						ide_write(part->block_bitmap,dir_inode->i_blocks[12],all_blocks+12,1);
+						ide_write(part->belong_to,dir_inode->i_blocks[12],all_blocks+12,1);
 					}else{
 						//只有这一个间接块 直接把dir_inode->blocks[12]=0，然后blockbitmap 对应的释放
 						block_bitmap_idx=dir_inode->i_blocks[12]-part->sb->data_start_lba;
@@ -278,9 +279,10 @@ bool delete_dir_entry(struct partition*part,struct dir* pdir,uint32_t inode_no,v
 					}
 				}
 				//释放这个目录项所在的块的bitmap占用
-				uint32_t block_bitmap_idx=all_blocks[block_idx]-part->sb->data_start_lba;
+				block_bitmap_idx=all_blocks[block_idx]-part->sb->data_start_lba;
 				bitmap_set(&part->block_bitmap,block_bitmap_idx,0);
 				bitmap_sync(part,block_bitmap_idx,BLOCK_BITMAP);	
+
 			}else{//对应还有其它目录项，只清除该项即可。
 				memset( dir_entry_found,0,sizeof(struct dir_entry)  );
 				ide_write(part->belong_to,all_blocks[block_idx],io_buf,1);
@@ -291,9 +293,11 @@ bool delete_dir_entry(struct partition*part,struct dir* pdir,uint32_t inode_no,v
 			dir_inode->i_size-=dir_entry_size;
 			memset(io_buf,0,SECTOR_SIZE*2);
 			inode_sync(part,dir_inode,io_buf);
+			sys_free(all_blocks);
 			return true;
 		}
 	}
 	//指向到这里说明没找到
+	sys_free(all_blocks);
 	return false;
 }

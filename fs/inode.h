@@ -17,4 +17,5 @@ void inode_sync(struct partition* part,struct inode* inode,void*io_buf);
 struct inode* inode_open(struct partition*part,uint32_t i_no);
 void inode_close(struct inode*i_node);
 void inode_init(uint32_t inode_no,struct inode* new_inode);
+void inode_release(struct partition*part,uint32_t inode_no);
 #endif
