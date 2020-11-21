@@ -201,3 +201,99 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 	printfk("directory is full!\n");
 	return false;
 }
+//以下函数删除part分区中的dir目录中 inode_no对应目录项删除
+bool delete_dir_entry(struct partition*part,struct dir* pdir,uint32_t inode_no,void*io_buf){
+	struct inode*dir_inode=pdir->inode;
+	uint32_t block_idx=0;
+	uint32_t block_cnt=12;
+	uint32_t* all_blocks=(uint32_t*)sys_malloc(sizeof(uint32_t)*140);
+
+	while(block_idx<12){
+		all_blocks[block_idx]=dir_inode->i_blocks[block_idx];
+		block_idx++;
+	}
+	if(dir_inode->i_blocks[12]){//如果有简介地址表 读入间接块地址
+		block_cnt=140;
+		ide_read(part->belong_to,dir_inode->i_blocks[12],all_blocks+12,1);
+	}
+	uint32_t dir_entry_size=part->sb->dir_entry_size;
+	uint32_t dir_entry_per_sec=(SECTOR_SIZE)/dir_entry_size;//dir_entry不跨扇区
+
+	struct dir_entry* dir_e=(struct dir_entry*)io_buf;
+	struct dir_entry* dir_entry_found=NULL;
+
+	uint8_t dir_entry_idx=0;
+	uint8_t dir_entry_cnt=0;
+	bool is_dir_first_block=false; //目录的第一个块
+	block_idx=0;
+	while(block_idx<block_cnt){
+		is_dir_first_block=false;
+		if(all_blocks[block_idx]){
+			dir_entry_idx=dir_entry_cnt=0;
+			memset(io_buf,0,SECTOR_SIZE);
+			ide_read(part->belong_to,all_blocks[block_idx],io_buf,1);
+			while(dir_entry_idx<dir_entry_per_sec){
+				//指针运算指向下一个dir_entry
+				if((dir_e+dir_entry_idx)->file_type!=FT_UNKNOW){//先看目录项是不是存在
+					if(!strcmp( (dir_e+dir_entry_idx)->file_name,"."  )){
+						is_dir_first_block=true; //如果存在 . 目录项 说明是block_idx对应的块是目录的第一个数据块,标记一下，拥有此标记的块不能删除
+					}else if( strcmp( (dir_e+dir_entry_idx)->file_name,".")&& strcmp( (dir_e+dir_entry_idx)->file_name,"..") ){//.和..对应的目录项不能删除
+						dir_entry_cnt++;//除 . ..外的目录项数++
+						if( (dir_e+dir_entry_idx)->i_no==inode_no ){
+							ASSERT(dir_entry_found==NULL);//确保只有一个目标inode_no
+							dir_entry_found=dir_e+dir_entry_idx;//指针指向找到的
+						}
+					}
+				}
+				dir_entry_idx++;
+			}
+			if(dir_entry_found==NULL){
+				block_idx++;
+				continue;//此扇区没找到不进行下面的步骤，继续下一个扇区
+			}
+			ASSERT(dir_entry_cnt>0);
+			if(dir_entry_cnt==1 &&!is_dir_first_block){//如果除 . ..以外只有目标目录项一个，并且目录项还不和. .. 储存在一个扇区里，那就释放当前扇区
+				//先处理 inode->i_blocks 以及间接地址表	
+				//如果简介地址表也要释放 也需要释放其block_bitmap
+				if(block_idx<12){
+					dir_inode->i_blocks[block_idx]=0;//先去掉直接块地址
+				}else{//block_idx大于12 所以必然有间接地址表 以及间接块，释放对应的间接块，如果间接地址表里只有这一个间接地址块，那么连间接地址表也释放掉
+					uint32_t indirect_blocks=0;
+					uint32_t indirect_block_idx=12;
+					while(indirect_block_idx<140){
+						if(all_blocks[indirect_block_idx]){
+							indirect_blocks++;
+						}
+					}
+					ASSERT(indirect_blocks>=1);
+					if(indirect_blocks>1){//还有其他间接块 不释放间接地址表 只释放块
+						all_blocks[block_idx]=0;
+						ide_write(part->block_bitmap,dir_inode->i_blocks[12],all_blocks+12,1);
+					}else{
+						//只有这一个间接块 直接把dir_inode->blocks[12]=0，然后blockbitmap 对应的释放
+						block_bitmap_idx=dir_inode->i_blocks[12]-part->sb->data_start_lba;
+						bitmap_set(&part->block_bitmap,block_bitmap_idx,0);
+						bitmap_sync(part,block_bitmap_idx,BLOCK_BITMAP);
+						dir_inode->i_blocks[12]=0;
+					}
+				}
+				//释放这个目录项所在的块的bitmap占用
+				uint32_t block_bitmap_idx=all_blocks[block_idx]-part->sb->data_start_lba;
+				bitmap_set(&part->block_bitmap,block_bitmap_idx,0);
+				bitmap_sync(part,block_bitmap_idx,BLOCK_BITMAP);	
+			}else{//对应还有其它目录项，只清除该项即可。
+				memset( dir_entry_found,0,sizeof(struct dir_entry)  );
+				ide_write(part->belong_to,all_blocks[block_idx],io_buf,1);
+
+			}
+			
+			//同步dir的inode修改
+			dir_inode->i_size-=dir_entry_size;
+			memset(io_buf,0,SECTOR_SIZE*2);
+			inode_sync(part,dir_inode,io_buf);
+			return true;
+		}
+	}
+	//指向到这里说明没找到
+	return false;
+}
