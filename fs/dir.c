@@ -283,6 +283,10 @@ bool delete_dir_entry(struct partition*part,struct dir* pdir,uint32_t inode_no,v
 				bitmap_set(&part->block_bitmap,block_bitmap_idx,0);
 				bitmap_sync(part,block_bitmap_idx,BLOCK_BITMAP);	
 
+				//我一度认为作者又出bug了 然而不是：如果扇区只有一项，直接释放扇区bitmap而不把扇区里的这一项清0，那么如果后面
+				//又把这个扇区分配给目录作为数据区，岂不是该目录项又回来了？然而 分配数据块时io_buf都是清0然后写入想要的信息再write的，所以不会受原来的信息
+				//影响。不清0，而是先读再修改原来块信息再写入的，只是bitmap
+
 			}else{//对应还有其它目录项，只清除该项即可。
 				memset( dir_entry_found,0,sizeof(struct dir_entry)  );
 				ide_write(part->belong_to,all_blocks[block_idx],io_buf,1);
