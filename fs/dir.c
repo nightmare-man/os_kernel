@@ -308,3 +308,51 @@ bool delete_dir_entry(struct partition*part,struct dir* pdir,uint32_t inode_no,v
 	sys_free(all_blocks);
 	return false;
 }
+//以下函数从目录中读一个目录项返回
+struct dir_entry* dir_read(struct dir* dir){
+	struct dir_entry*dir_e =(struct dir_entry*)dir->dir_buf;//dir->dir_buf当dir打开后用来缓存已经读入的目录项（已经读入的目录项必然要有一块内存保存，单独
+	//malloc不太好，容易忘记free内存泄漏了，因此内嵌在dir结构里，关闭dir时一并free）
+	struct inode*dir_inode=dir->inode;
+	uint32_t* all_blocks=(uint32_t*)sys_malloc(140*sizeof(uint32_t));//记得free哦
+	uint32_t block_idx=0;
+	uint32_t dir_entry_idx=0;
+	uint32_t block_cnt=12;
+	while(block_idx<12){
+		all_blocks[block_idx]=dir_inode->i_blocks[block_idx];
+		block_idx++;
+	}
+	if(dir_inode->i_blocks[12]){
+		ide_read(cur_part->belong_to,dir_inode->i_blocks[12],all_blocks+12,1);
+		block_cnt=140;
+	}
+	block_idx=0;
+	uint32_t cur_dir_entry_pos=0;
+	uint32_t dir_entry_size=cur_part->sb->dir_entry_size;
+	uint32_t dir_entrys_per_sec=SECTOR_SIZE/dir_entry_size;
+
+	while(dir->dir_pos<dir_inode->i_size){
+		if(all_blocks[block_idx]==0){
+			block_idx++;
+			continue;
+		}
+		memset(dir_e,0,SECTOR_SIZE);//缓冲区清0
+		ide_read(cur_part->belong_to,all_blocks[block_idx],dir_e,1);
+		dir_entry_idx=0;
+		while(dir_entry_idx<dir_entrys_per_sec){
+			if( (dir_e+dir_entry_idx)->file_type!=FT_UNKNOW ){
+				if(cur_dir_entry_pos<dir->dir_pos){//已经读过的目录项 不重复读了 只是增加当前的——cur_dir_entry,一直到比dir_pos大 返回那个dir_e并
+					cur_dir_entry_pos+=dir_entry_size;//增加dir_pos
+					dir_entry_idx++;
+					continue;
+				}
+				ASSERT(cur_dir_entry_pos==dir->dir_pos);
+				dir->dir_pos+=dir_entry_size;
+				return (dir_e+dir_entry_idx);
+
+			}
+			dir_entry_idx++;
+		}
+		block_idx++;
+	}
+	return NULL;//如果到这里 说明dir_pos 等于inode->i_size越界了 所有目录项之前都读完了
+}
