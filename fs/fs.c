@@ -248,16 +248,20 @@ void filesys_init(){
 
 //以下函数将pathname的最上层路径名 存入name_store，并返回指向下一层路径的指针
 static char* path_parse(char* pathname,char*name_store){
-	if(pathname[0]=='/'){
-		while(*(++pathname)=='/');//跳过'/'
+	char*ptr=pathname;
+	if(ptr[0]=='/'){
+		while(*(++ptr)=='/');//跳过'/'
 	}
-	while(*pathname!='/'&&*pathname!=0){
-		*name_store++=*pathname++;
+	while(*ptr!='/'&&*ptr!=0){
+		*name_store=*ptr;
+		name_store++;
+		ptr++;
 	}
-	if(pathname[0]=0){
+	if(pathname[0]==0){
 		return NULL;
 	}
-	return pathname;//返回指向下一层路径的新指针
+	//printfk("after parse path:%s\n",ptr);
+	return ptr;//返回指向下一层路径的新指针
 }
 //以下函数返回路径深度
 int32_t path_depth_cnt(char* pathname){
@@ -280,6 +284,7 @@ int32_t path_depth_cnt(char* pathname){
 //搜索文件pathname,若找到则返回其inode号，否则返回-1
 //！！此函数会调用dir_open 打开parent_dir(也就是分配内存来记录相关信息) 要求主调函数调用后自行调用dir_close，不然会内存泄漏！！
 static int search_file(const char* pathname,struct path_search_record*searched_record){
+
 	//如果是查找根目录 直接返回
 	if( !strcmp(pathname,"/")  || !strcmp(pathname,"/.") || !strcmp(pathname,"/..")){
 		searched_record->file_type=FT_DIRECTORY;
@@ -301,9 +306,9 @@ static int search_file(const char* pathname,struct path_search_record*searched_r
 	searched_record->file_type=FT_UNKNOW ;//file_type是记录每级带查找目录项的类型，初始化为FT_UNKNOW
 	//化为FT_UNKNOW
 	uint32_t parent_inode_no=0;
-
 	sub_path=path_parse(sub_path,name);
 
+	
 	//循环 如果能够解析 下一级目录名
 	while(name[0]){
 
@@ -320,7 +325,6 @@ static int search_file(const char* pathname,struct path_search_record*searched_r
 			if(sub_path){//路径还没完，继续搜索下一级目录名
 				sub_path=path_parse(sub_path,name);
 			}
-
 			//如果本目录项 类型是目录，就更新paret_inode_no和searched_record->parent_dir(需要open_dir),同时close之前的parent_dir
 			if(FT_DIRECTORY==dir_e.file_type){
 				parent_inode_no=parent_dir->inode->i_no;
@@ -521,4 +525,104 @@ int32_t sys_unlink(const char* pathname){
 	sys_free(io_buf);
 	dir_close(searched_record.parent_dir);
 	return 0;
+}
+int32_t sys_mkdir(const char*pathname){
+	uint8_t rollback_step=0;
+	void* io_buf=sys_malloc(SECTOR_SIZE*2);
+	if(io_buf==NULL){
+		printfk("[fs.c]sys_mkdir:malloc memory fail\n");
+		return -1;
+	}
+
+	struct path_search_record searched_record;
+	memset(&searched_record,0,sizeof(searched_record));
+	int inode_no=-1;
+	inode_no=search_file(pathname,&searched_record);
+	if(inode_no!=-1){//如果找到了同名目录/文件 那就报错
+		printfk("[fs.c]sys_mkdir:file or directory %s exist!\n",pathname);
+		rollback_step=1;
+		goto rollback;
+	}
+	//如果没找到 也要看是同名文件没找到还是中间目录不存在
+	uint32_t pathname_depth=path_depth_cnt((char*)pathname);
+	uint32_t path_searched_depth=path_depth_cnt(searched_record.searched_path);
+	if(pathname_depth!=path_searched_depth){//说明中间目录不存在
+		printfk("[fs.c]sys_mkdir:cannot access %s:Not a directory,subpath %s does not exist!\n",pathname,searched_record.searched_path);
+		rollback_step=1;
+		goto rollback;
+	}
+	//至此 确定父目录存在且不存在同名
+	struct dir* parent_dir=searched_record.parent_dir;
+	char*dirname=strrchr( searched_record.searched_path,'/')+1;//在这里searched_record.searched_path和pathname不一定相同，
+	//因为pathname可能以/结尾 ，而前者会去掉结尾的/
+	inode_no=inode_bitmap_alloc(cur_part);
+	if(inode_no==-1){
+		printfk("[fs.c]sys_mkdir:malloc inode_bitmap fail\n");
+		rollback_step=1;
+		goto rollback;
+	}
+	//立即同步占用
+	bitmap_sync(cur_part,inode_no,INODE_BITMAP);
+	struct inode new_dir_inode;
+	inode_init(inode_no,&new_dir_inode);
+	uint32_t block_bitmap_idx=0;
+	uint32_t block_lba=-1;
+	block_lba=block_bitmap_alloc(cur_part);
+		
+	if(block_lba==-1){
+		rollback_step=2;//前面有几个需要回滚的操作 rollback_step就为几
+		goto rollback;
+	}
+	new_dir_inode.i_blocks[0]=block_lba;
+	block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
+	bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
+	
+	memset(io_buf,0,SECTOR_SIZE*2);
+	struct dir_entry* pde=(struct dir_entry*)io_buf;
+	memcpy(pde->file_name,".",1);// 创建. ..目录项 分别位于0 1
+	pde->file_type=FT_DIRECTORY;
+	pde->i_no=inode_no;//指向自己
+
+	pde++;
+	memcpy(pde->file_name,"..",2);
+	pde->file_type=FT_DIRECTORY;
+	pde->i_no=parent_dir->inode->i_no;//指向父目录
+	//同步到硬盘
+	ide_write(cur_part->belong_to,block_lba,io_buf,1);
+
+	new_dir_inode.i_size=2*sizeof(struct dir_entry);
+
+	//在父目录里添加自己的目录项
+	struct dir_entry new_dir_entry;
+	memset(&new_dir_entry,0,sizeof(struct dir_entry));
+	create_dir_entry(dirname,new_dir_inode.i_no,FT_DIRECTORY,&new_dir_entry);
+	memset(io_buf,0,SECTOR_SIZE*2);
+	if(!sync_dir_entry(parent_dir,&new_dir_entry,io_buf)){//如果写入失败
+		printfk("[fs.c]sys_mkdir:sync_dir_entry to dsik fail\n");
+		rollback_step=3;
+		goto rollback;
+	}
+	
+	memset(io_buf,0,SECTOR_SIZE*2);//父目录的inode修改要同步
+	inode_sync(cur_part,parent_dir->inode,io_buf);
+
+	memset(io_buf,0,SECTOR_SIZE*2);//新的dir_entry的inode也要同步
+	inode_sync(cur_part,&new_dir_inode,io_buf);
+	sys_free(io_buf);
+	dir_close(searched_record.parent_dir);
+	return 0;
+rollback://有条不稳的按顺序回滚 switch是跳转地址表，没有break就按顺序执行
+	switch (rollback_step)
+	{
+	case 3:
+		bitmap_set(&cur_part->block_bitmap,block_bitmap_idx,0);
+		bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
+	case 2:
+		bitmap_set(&cur_part->inode_bitmap,inode_no,0);
+		bitmap_sync(cur_part,inode_no,INODE_BITMAP);
+	case 1:
+		dir_close(searched_record.parent_dir);
+		sys_free(io_buf);
+	}
+	return -1;
 }

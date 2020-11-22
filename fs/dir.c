@@ -105,6 +105,7 @@ void create_dir_entry(char* filename,uint32_t inode_no,uint8_t filetype,struct d
 //（并更新dir->inode->i_blocks地址表（可能需要新建间接地址表来储存））
 
 //此函数只同步了数据块里的目录项 可能会修改父目录的inode 但是不负责同步！！
+//主调函数需要负责同步父目录的inode到磁盘
 
 //感觉作者写的有bug all_blocks只复制了前12个直接地址 ，其余全初始化为0
 //那么这个判断if(dir_inode->i_blocks[block_idx]==0) 无法判断简介块
@@ -132,12 +133,12 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 	struct dir_entry*dir_e=(struct dir_entry*)io_buf;//将iobuf当作临时缓冲区 存dir_entry
 	int32_t block_bitmap_idx=-1;
 	block_idx=0;
-	
+	printfk("parent dir:size:%d,i_no:%d,lba[0]:%d\n",dir_inode->i_size,dir_inode->i_no,dir_inode->i_blocks[0]);
 	
 	while(block_idx<140){//
 		block_bitmap_idx=-1;
 		if(dir_inode->i_blocks[block_idx]==0){//如果该地址表项为0，说明需要新建一个数据块来储存dir_entry
-
+			printfk("parent dir inode lba[%d] ==0\n",block_idx);
 			block_lba=block_bitmap_alloc(cur_part);
 			if(block_lba==-1){
 				printfk("[sync_dir_entry]alloc bitmap for block fail!\n");
@@ -179,19 +180,21 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 			dir_inode->i_size+=dir_entry_size;
 			return true;
 
+
 		}
-		
+		printfk("parent dir inode lba[%d] !=0,lba :%d\n",block_idx,all_blocks[block_idx]);
 		//刚开始循环时 all_blocks[block_idx]!=0 对应有数据块，我们看看这些数据块有没有空间放入dir_entry
 		ide_read(cur_part->belong_to,all_blocks[block_idx],io_buf,1);
 		uint8_t dir_entry_idx=0;
 		while(dir_entry_idx<dir_entry_per_sec){
 			if((dir_e+dir_entry_idx)->file_type==FT_UNKNOW){
-				
+				printfk("this sector dir_e idx:%d is free\n",dir_entry_idx);
 				//dir_entry 初始化和被删除后都置为 FT_UNKNOW 此处为unknow 说明这个位置空
 				memcpy(dir_e+dir_entry_idx,p_de,dir_entry_size);
 				
 				ide_write(cur_part->belong_to,all_blocks[block_idx],io_buf,1);
 				dir_inode->i_size+=dir_entry_size;
+				printfk("finally dir_inode size:%d\n",dir_inode->i_size);
 				return true;
 			}
 			dir_entry_idx++;

@@ -41,4 +41,5 @@ int32_t sys_read(int32_t fd,void* buf,uint32_t count);
 uint32_t fd_local2global(uint32_t local_fd);
 int32_t sys_lseek(int32_t fd,int32_t offset,uint8_t whence);
 int32_t sys_unlink(const char* pathname);
+int32_t sys_mkdir(const char*pathname);
 #endif
