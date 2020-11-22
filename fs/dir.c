@@ -338,6 +338,7 @@ struct dir_entry* dir_read(struct dir* dir){
 		memset(dir_e,0,SECTOR_SIZE);//缓冲区清0
 		ide_read(cur_part->belong_to,all_blocks[block_idx],dir_e,1);
 		dir_entry_idx=0;
+		//遍历每个磁盘的目录项
 		while(dir_entry_idx<dir_entrys_per_sec){
 			if( (dir_e+dir_entry_idx)->file_type!=FT_UNKNOW ){
 				if(cur_dir_entry_pos<dir->dir_pos){//已经读过的目录项 不重复读了 只是增加当前的——cur_dir_entry,一直到比dir_pos大 返回那个dir_e并
@@ -347,6 +348,7 @@ struct dir_entry* dir_read(struct dir* dir){
 				}
 				ASSERT(cur_dir_entry_pos==dir->dir_pos);
 				dir->dir_pos+=dir_entry_size;
+				sys_free(all_blocks);
 				return (dir_e+dir_entry_idx);
 
 			}
@@ -354,5 +356,6 @@ struct dir_entry* dir_read(struct dir* dir){
 		}
 		block_idx++;
 	}
+	sys_free(all_blocks);
 	return NULL;//如果到这里 说明dir_pos 等于inode->i_size越界了 所有目录项之前都读完了
 }

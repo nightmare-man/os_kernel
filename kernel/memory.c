@@ -326,8 +326,8 @@ static struct mem_block* arena2block(struct arena* a,uint32_t idx){
 static struct arena* block2arena(struct mem_block*b){
 	return (struct arena*)( (uint32_t)b & 0xfffff000);
 }
-//以下从内存池中分配字节（即是堆中分配）
-void* sys_malloc(uint32_t size){
+
+void* sys_malloc(uint32_t size){//以下从内存池中分配字节（即是堆中分配）分配的内存已经清零
 	enum pool_flags PF;
 	struct pool* mem_pool;
 	uint32_t pool_size;

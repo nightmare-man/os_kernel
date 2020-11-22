@@ -42,4 +42,8 @@ uint32_t fd_local2global(uint32_t local_fd);
 int32_t sys_lseek(int32_t fd,int32_t offset,uint8_t whence);
 int32_t sys_unlink(const char* pathname);
 int32_t sys_mkdir(const char*pathname);
+struct dir* sys_opendir(const char*name);
+int32_t sys_closedir(struct dir*dir);
+struct dir_entry* sys_readdir(struct dir* dir);
+void sys_rewinddir(struct dir*dir);
 #endif

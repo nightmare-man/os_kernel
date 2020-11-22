@@ -46,6 +46,6 @@ void* get_kernel_page(uint32_t pg_cnt);//此函数从内核内存池分配内存
 void* get_a_page(enum pool_flags pf,uint32_t vaddr);
 uint32_t addr_v2p(uint32_t vaddr);
 void block_desc_init(struct mem_block_desc* desc_array);
-void* sys_malloc(uint32_t size);//分配块内存空间
+void* sys_malloc(uint32_t size);//分配块内存空间 默认清零了
 void sys_free(void*ptr);
 #endif

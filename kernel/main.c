@@ -24,8 +24,9 @@
 #include "../device/ide.h"
 #include "../fs/fs.h"
 #include "../fs/file.h"
-extern struct file file_table[MAX_FILE_OPEN];
-extern struct partition*cur_part;
+#include "../fs/dir.h"
+// extern struct file file_table[MAX_FILE_OPEN];
+// extern struct partition*cur_part;
 /*
 	在下面的测试中 我将test()函数写在main函数前面，这样的话，test编译后main.o里的位置也在main的前面
 	加载到内存空间里也在main函数的前面，所以 通过-Ttext 0xc0001500 链接后的代码段的起始位置是0xc0001500
@@ -69,13 +70,20 @@ int main(){
 
 	//以下代码测试 sys_write sys_read 经测试均正常工作
 	//printfk(" create %s!\n",sys_mkdir("/dir2/dir3/dir4")==0?"done":"fail");
-	int fd=sys_open("/dir2/dir3/dir4/file1",O_RDWR);
-	sys_write(fd,"hello,world\n",12);
-	char buf[20]={0};
-	sys_lseek(fd,0,SEEK_SET);
-	sys_read(fd,buf,20);
+	
+	int fd=sys_open("/file99",O_RDWR|O_CREAT);
 	sys_close(fd);
-	printfk("buf content---\n%s\n",buf);
+	sys_mkdir("/dir4");
+	sys_mkdir("/dir5");
+	sys_mkdir("/dir6");
+	sys_mkdir("/dir7");
+	struct dir* dir=sys_opendir("/");
+	struct dir_entry* dir_e=NULL;
+	if(dir){
+		while(dir_e=sys_readdir(dir)){
+			printfk("type:%s,name:%s\n",dir_e->file_type==FT_DIRECTORY?"directory":"file",dir_e->file_name);
+		}
+	}
 	while(1);
 	
 	//thread_yeild();

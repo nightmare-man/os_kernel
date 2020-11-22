@@ -635,7 +635,7 @@ struct dir* sys_opendir(const char*name){
 	struct dir*ret=NULL;
 	if(inode_no==0){
 		return &root_dir;
-	}else if(indoe_no==-1){
+	}else if(inode_no==-1){
 		printfk("In %s,sub path %s not exist\n",name, ( strrchr(searched_record.searched_path,'/')+1  ));
 	}else{
 		if(searched_record.file_type==FT_REGULAR){
@@ -654,4 +654,13 @@ int32_t sys_closedir(struct dir*dir){
 		dir_close(dir);
 	}
 	return ret;
+}
+struct dir_entry* sys_readdir(struct dir* dir){
+	ASSERT( (dir));
+	return dir_read(dir);
+}
+//此函数将dir里的dir_pos置0，这样readdir返回的就是第一个目录项了
+void sys_rewinddir(struct dir*dir){
+	ASSERT((dir));
+	dir->dir_pos=0;
 }
