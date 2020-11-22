@@ -626,3 +626,32 @@ rollback://有条不稳的按顺序回滚 switch是跳转地址表，没有break
 	}
 	return -1;
 }
+struct dir* sys_opendir(const char*name){
+	ASSERT(strlen(name)<=MAX_FILE_NAME_LEN);
+	
+	struct path_search_record searched_record;
+	memset(&searched_record,0,sizeof(searched_record));
+	int inode_no=search_file(name,&searched_record);
+	struct dir*ret=NULL;
+	if(inode_no==0){
+		return &root_dir;
+	}else if(indoe_no==-1){
+		printfk("In %s,sub path %s not exist\n",name, ( strrchr(searched_record.searched_path,'/')+1  ));
+	}else{
+		if(searched_record.file_type==FT_REGULAR){
+			printfk("%s is regular file!\n");
+		}else if(searched_record.file_type==FT_DIRECTORY){
+			ret=dir_open(cur_part,inode_no);
+		}
+	}
+	dir_close(searched_record.parent_dir);
+	return ret;
+}
+int32_t sys_closedir(struct dir*dir){
+	int32_t ret=-1;
+	if(dir){
+		ret=0;
+		dir_close(dir);
+	}
+	return ret;
+}
