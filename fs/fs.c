@@ -701,7 +701,7 @@ static uint32_t get_parent_dir_inode_no(uint32_t child_inode_no,void* io_buf){
 	uint32_t block_lba=child_inode->i_blocks[0];
 	ASSERT(block_lba>=cur_part->sb->data_start_lba);
 	inode_close(child_inode);
-	ide_read(cur_part->belong_to,block_lba,io_buf);
+	ide_read(cur_part->belong_to,block_lba,io_buf,1);
 	struct dir_entry* dir_e =(struct dir_entry*)io_buf;
 	ASSERT(dir_e[1].i_no<MAX_FILES_PER_PART&&dir_e[1].file_type==FT_DIRECTORY);//0对应. 1对应..
 	return dir_e[1].i_no;
@@ -734,6 +734,7 @@ static int32_t get_child_dir_name(uint32_t p_inode_no,uint32_t c_inode_no,char*p
 				if( (dir_e+dir_entry_idx)->i_no==c_inode_no ){
 					strcat(path,"/");
 					strcat(path,(dir_e+dir_entry_idx)->file_name);
+					sys_free(all_blocks);
 					return 0;
 				}
 				dir_entry_idx++;
@@ -741,5 +742,11 @@ static int32_t get_child_dir_name(uint32_t p_inode_no,uint32_t c_inode_no,char*p
 		}
 		block_idx++;
 	}
+	sys_free(all_blocks);
 	return -1;
+}
+
+//以下函数把当前工作路径写入buf， buf大小为size，如果为NULL，则由操作系统malloc 内存保存并返回
+char* sys_getcwd(char*buf,uint32_t size){
+
 }

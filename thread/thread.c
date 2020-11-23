@@ -82,6 +82,7 @@ void init_thread(struct task_struct* pthread,char*name,int prio){
 		pthread->fd_table[fd_idx]=-1;
 		fd_idx++;
 	}
+	pthread->cwd_inode_no=0;//默认以根目录为工作目录
 }
 
 //以下函数创建一个线程 并将该线程加入到ready链表 all链表 （1 初始tcb 2初始化tcb->thread_task上下文 3加入链表）

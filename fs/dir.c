@@ -142,6 +142,7 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 			block_lba=block_bitmap_alloc(cur_part);
 			if(block_lba==-1){
 				printfk("[sync_dir_entry]alloc bitmap for block fail!\n");
+				sys_free(all_blocks);
 				return false;
 			}
 			block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
@@ -161,6 +162,7 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 					bitmap_set(&cur_part->block_bitmap,block_bitmap_idx,0);
 					dir_inode->i_blocks[12]=0;
 					printfk("[sync_dir_entry]alloc bitmap for block fail!\n");
+					sys_free(all_blocks);
 					return false;
 				}
 				block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
@@ -178,6 +180,7 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 			memcpy(io_buf,p_de,dir_entry_size);
 			ide_write(cur_part->belong_to,all_blocks[block_idx],io_buf,1);
 			dir_inode->i_size+=dir_entry_size;
+			sys_free(all_blocks);
 			return true;
 
 
@@ -195,6 +198,7 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 				ide_write(cur_part->belong_to,all_blocks[block_idx],io_buf,1);
 				dir_inode->i_size+=dir_entry_size;
 				printfk("finally dir_inode size:%d\n",dir_inode->i_size);
+				sys_free(all_blocks);
 				return true;
 			}
 			dir_entry_idx++;
@@ -202,6 +206,7 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf){
 		block_idx++;
 	}
 	printfk("directory is full!\n");
+	sys_free(all_blocks);
 	return false;
 }
 //以下函数删除part分区中的dir目录中 inode_no对应目录项删除

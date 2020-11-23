@@ -90,7 +90,7 @@ struct task_struct{
 	struct list_elem all_list_tag;//再次创建一个elem，放入总的线程列表（这个列表记录所有线程）
 		//为什么需要两个elem 因为要放在两个队列里，而单个elem只有一个前驱一个后继 只能表示在一个列表里的位置
 		// 列表里只有elem没有 task_struct 都是通过前面定义的elem2entry反推task_struct的地址的
-	
+	uint32_t cwd_inode_no;//进程的工作目录的inode_no current work directory
 	int fd_table[MAX_FILES_OPEN_PER_PROC]; //文件描述符表
 	uint32_t* pgdir;//执行流的页表的虚拟地址 如果为线程 该项为NULL 
 	struct mem_block_desc u_block_descs[DESC_CNT];//用户进程的block_desc表，用于满足sys_malloc分配，线程此项为NULL

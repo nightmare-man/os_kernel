@@ -216,6 +216,7 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 	}
 	//作者又又又来bug了，这里原文分配的是512 而我分配的是1024
 	uint8_t *io_buf=(uint8_t*)sys_malloc(BLOCK_SIZE*2);//为什么是1024而不是512？因为后面要调用inode_sync传给它，需要1024字节的buf
+	//malloc 一定要free
 	if(io_buf==NULL){
 		printfk("[file.c]file_write malloc memory fail!\n");
 		return -1;
@@ -272,6 +273,8 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 					block_lba=block_bitmap_alloc(cur_part);
 					if(block_lba==-1){
 						printfk("[file.c]file_write malloc block fail,situation 1\n");
+						sys_free(io_buf);
+						sys_free(all_blocks);
 						return -1;
 					}
 					file->fd_inodes->i_blocks[block_idx]=all_blocks[block_idx]=block_lba;
@@ -286,13 +289,15 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 			block_lba=block_bitmap_alloc(cur_part);
 			if(block_lba==-1){
 				printfk("[file.c]file_write malloc block fail,situation 2\n");
+				sys_free(io_buf);
+				sys_free(all_blocks);
 				return -1;
 			}
 			ASSERT(file->fd_inodes->i_blocks[12]==0);//没有间接表
 			indirect_block_table=file->fd_inodes->i_blocks[12]=block_lba;
 			block_bitmap_idx=block_lba-cur_part->sb->data_start_lba;
-			//作者这里掉了一个bitmap_sync，我给补上了 bug+1
-			bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
+			//作者这里掉了一个bitmap_sync，我给补上了 bug+1    //11-23补充 我错了 一共alloc两个block 作者是都alloc后才sync，这样免得失败回退
+			//bitmap_sync(cur_part,block_bitmap_idx,BLOCK_BITMAP);
 
 			block_idx=file->fd_inodes->i_size/BLOCK_SIZE;//第一个待写入的块的索引
 			while(block_idx<file_will_use_blocks){
@@ -303,6 +308,8 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 						block_lba=block_bitmap_alloc(cur_part);
 						if(block_lba==-1){
 							printfk("[file.c]file_write malloc block fail,situation 1\n");
+							sys_free(io_buf);
+							sys_free(all_blocks);
 							return -1;
 						}
 						file->fd_inodes->i_blocks[block_idx]=all_blocks[block_idx]=block_lba;
@@ -311,6 +318,8 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 					block_lba=block_bitmap_alloc(cur_part);
 					if(block_lba==-1){
 						printfk("[file.c]file_write malloc block fail,situation 1\n");
+						sys_free(io_buf);
+						sys_free(all_blocks);
 						return -1;
 					}
 					//要写到间接地址表的块中，我们先写到all_blocks中 然后一起ide_write到间接地址表的块里
@@ -333,6 +342,8 @@ int32_t file_write(struct file*file,const void *buf,uint32_t count ){
 					block_lba=block_bitmap_alloc(cur_part);
 					if(block_lba==-1){
 						printfk("[file.c]file_write malloc block fali,situation 3\n");
+						sys_free(io_buf);
+						sys_free(all_blocks);
 						return -1;
 					}
 					all_blocks[block_idx]=block_lba;
