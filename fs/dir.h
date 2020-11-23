@@ -26,4 +26,6 @@ bool sync_dir_entry(struct dir* parent_dir,struct dir_entry*p_de,void*io_buf);
 void open_root_dir(struct partition*part);
 bool delete_dir_entry(struct partition*part,struct dir* pdir,uint32_t inode_no,void*io_buf);
 struct dir_entry* dir_read(struct dir* dir);
+bool dir_is_empty(struct dir * dir);
+int32_t dir_remove(struct dir*parent_dir,struct dir*child_dir);
 #endif

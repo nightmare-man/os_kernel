@@ -71,14 +71,19 @@ int main(){
 	//以下代码测试 sys_write sys_read 经测试均正常工作
 	//printfk(" create %s!\n",sys_mkdir("/dir2/dir3/dir4")==0?"done":"fail");
 	
-	int fd=sys_open("/file99",O_RDWR|O_CREAT);
-	sys_close(fd);
-	sys_mkdir("/dir4");
-	sys_mkdir("/dir5");
-	sys_mkdir("/dir6");
-	sys_mkdir("/dir7");
+	
 	struct dir* dir=sys_opendir("/");
 	struct dir_entry* dir_e=NULL;
+	//sys_rmdir("/dir4");
+	if(dir){
+		while(dir_e=sys_readdir(dir)){
+			printfk("type:%s,name:%s\n",dir_e->file_type==FT_DIRECTORY?"directory":"file",dir_e->file_name);
+		}
+	}
+
+	sys_rmdir("/dir5");
+	printfk("once again\n");
+	sys_rewinddir(dir);
 	if(dir){
 		while(dir_e=sys_readdir(dir)){
 			printfk("type:%s,name:%s\n",dir_e->file_type==FT_DIRECTORY?"directory":"file",dir_e->file_name);

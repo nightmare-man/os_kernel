@@ -664,3 +664,82 @@ void sys_rewinddir(struct dir*dir){
 	ASSERT((dir));
 	dir->dir_pos=0;
 }
+int32_t sys_rmdir(const char*pathname){
+	int ret=-1;
+	struct path_search_record searched_record;
+	memset(&searched_record,0,sizeof(searched_record));
+	int inode_no=search_file(pathname,&searched_record);
+	if(inode_no==0){
+		printfk("can't remove root dir\n");
+		dir_close(searched_record.parent_dir);
+		return -1;
+	}
+	if(inode_no==-1){
+		printfk("In %s,sub path %s not exist!\n",pathname,  strrchr(searched_record.searched_path,'/')+1 );
+		dir_close(searched_record.parent_dir);
+		return -1;
+	}
+	if(searched_record.file_type==FT_REGULAR){
+		printfk("%s is regular file!\n",pathname);
+		dir_close(searched_record.parent_dir);
+		return -1;
+	}
+	struct dir* child_dir=dir_open(cur_part,inode_no);//打开待删除目录
+	if(!dir_is_empty(child_dir)){
+		printfk("dir %s is not empty!\n",pathname);
+		dir_close(child_dir);
+		dir_close(searched_record.parent_dir);
+		return -1;
+	}
+	ret=dir_remove(searched_record.parent_dir,child_dir);
+	dir_close(child_dir);
+	dir_close(searched_record.parent_dir);
+	return ret;
+}
+static uint32_t get_parent_dir_inode_no(uint32_t child_inode_no,void* io_buf){
+	struct inode*child_inode=inode_open(cur_part,child_inode_no);
+	uint32_t block_lba=child_inode->i_blocks[0];
+	ASSERT(block_lba>=cur_part->sb->data_start_lba);
+	inode_close(child_inode);
+	ide_read(cur_part->belong_to,block_lba,io_buf);
+	struct dir_entry* dir_e =(struct dir_entry*)io_buf;
+	ASSERT(dir_e[1].i_no<MAX_FILES_PER_PART&&dir_e[1].file_type==FT_DIRECTORY);//0对应. 1对应..
+	return dir_e[1].i_no;
+}
+//以下函数 将p_inode_no对应的父目录中的c_inode_no子目录项找出来，并将其名字  cat（拼接）到 字符串path里
+static int32_t get_child_dir_name(uint32_t p_inode_no,uint32_t c_inode_no,char*path,void*io_buf){
+	struct inode*p_inode=inode_open(cur_part,p_inode_no);
+	uint8_t block_idx=0;
+	uint32_t*all_blocks=(uint32_t*)sys_malloc(140*sizeof(uint32_t));
+	uint32_t block_cnt=12;
+	while(block_idx<12){
+		all_blocks[block_idx]=p_inode->i_blocks[block_idx];
+		block_idx++;
+	}
+	if(p_inode->i_blocks[12]){
+		block_cnt=140;
+		ide_read(cur_part->belong_to,p_inode->i_blocks[12],all_blocks+12,1);
+	}
+	inode_close(p_inode);
+
+	struct dir_entry*dir_e=(struct dir_entry*)io_buf;
+	uint32_t dir_entry_size=cur_part->sb->dir_entry_size;
+	uint32_t dir_entry_per_sec=SECTOR_SIZE/dir_entry_size;
+	block_idx=0;
+	while(block_idx<block_cnt){
+		if(all_blocks[block_idx]){
+			ide_read(cur_part->belong_to,all_blocks[block_idx],io_buf,1);//这里没有必要memset io_buf，因为每次读出来都覆盖不会数据混乱
+			uint8_t dir_entry_idx=0;
+			while(dir_entry_idx<dir_entry_per_sec){
+				if( (dir_e+dir_entry_idx)->i_no==c_inode_no ){
+					strcat(path,"/");
+					strcat(path,(dir_e+dir_entry_idx)->file_name);
+					return 0;
+				}
+				dir_entry_idx++;
+			}
+		}
+		block_idx++;
+	}
+	return -1;
+}
