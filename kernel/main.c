@@ -72,12 +72,23 @@ int main(){
 	//printfk(" create %s!\n",sys_mkdir("/dir2/dir3/dir4")==0?"done":"fail");
 	
 	
-	char cwd_buf[32]={0};
-	sys_getcwd(cwd_buf,32);
-	printfk("cur work dir is %s\n",cwd_buf);
-	sys_chdir("/dir2/dir3");
-	sys_getcwd(cwd_buf,32);
-	printfk("cur work dir is %s\n",cwd_buf);
+	struct dir* rootdir=sys_opendir("/.");
+	struct dir_entry* dir_e=NULL;
+	int fd=sys_open("/file99",O_RDWR);
+	sys_write(fd,"hello,world",11);
+	sys_close(fd);
+	if(rootdir){
+		sys_chdir("/.");
+		while(dir_e=sys_readdir(rootdir) ){
+			char buf[32]={0};
+			sys_getcwd(buf,32);
+			struct stat t_stat;
+			strcat(buf,dir_e->file_name);
+			sys_stat( buf,&t_stat );
+			printfk("%s   %s    %d    %d\n",buf,t_stat.st_filetype==FT_DIRECTORY?"DIR":"FILE",t_stat.st_ino,t_stat.st_size);
+		}
+	}
+	sys_closedir(rootdir);
 	while(1);
 	
 	//thread_yeild();

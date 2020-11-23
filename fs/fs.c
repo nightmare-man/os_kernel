@@ -802,3 +802,27 @@ int32_t sys_chdir(const char* path){
 	dir_close(searched_record.parent_dir);
 	return ret;
 }
+int32_t sys_stat(const char* path,struct stat*buf){
+	if(!strcmp(path,"/") || !strcmp(path,"/.")  || !strcmp(path,"/..")  ){
+		buf->st_filetype=FT_DIRECTORY;
+		buf->st_ino=0;
+		buf->st_size=root_dir.inode->i_size;
+		return 0;
+	}
+	int32_t ret=-1;
+	struct path_search_record searched_record;
+	memset(&searched_record,0,sizeof(searched_record));
+	int inode_no=search_file(path,&searched_record);
+	if(inode_no!=-1){
+		struct inode* tar=inode_open(cur_part,inode_no);
+		buf->st_size=tar->i_size;
+		buf->st_ino=inode_no;
+		buf->st_filetype=searched_record.file_type;
+		inode_close(tar);
+		ret=0;
+	}else{
+		printfk("[fs.c]sys_stat:file %s not found\n",path);
+	}
+	dir_close(searched_record.parent_dir);
+	return ret;
+}

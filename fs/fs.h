@@ -32,6 +32,11 @@ enum whence{
 	SEEK_CUR,
 	SEEK_END
 };
+struct stat{
+	uint32_t st_ino;
+	uint32_t st_size;
+	enum file_types st_filetype;
+};
 int32_t path_depth_cnt(char* pathname);
 void filesys_init();
 int32_t sys_open(const char* pathname,uint8_t flags);
@@ -49,4 +54,5 @@ void sys_rewinddir(struct dir*dir);
 int32_t sys_rmdir(const char*pathname);
 char* sys_getcwd(char*buf,uint32_t size);
 int32_t sys_chdir(const char* path);
+int32_t sys_stat(const char* path,struct stat*buf);
 #endif
