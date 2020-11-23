@@ -748,5 +748,57 @@ static int32_t get_child_dir_name(uint32_t p_inode_no,uint32_t c_inode_no,char*p
 
 //以下函数把当前工作路径写入buf， buf大小为size，如果为NULL，则由操作系统malloc 内存保存并返回
 char* sys_getcwd(char*buf,uint32_t size){
-
+	ASSERT(buf);
+	void* io_buf=sys_malloc(SECTOR_SIZE);//io_buf是给其调用的函数分配的缓冲区
+	if(io_buf==NULL){
+		printfk("[fs.s]sys_getcwd:malloc memory fail\n");
+		return NULL;
+	}
+	struct task_struct* cur=running_thread();
+	int32_t p_inode_no=0;
+	int32_t c_inode_no=cur->cwd_inode_no;
+	ASSERT(c_inode_no>=0 && c_inode_no<MAX_FILES_PER_PART);
+	if(c_inode_no==0){//根目录
+		buf[0]='/';
+		buf[1]=0;
+		return buf;
+	}
+	memset(buf,0,size);
+	char full_path_reverse[MAX_PATH_LEN]={0};//路径缓冲区
+	//以下循环获取上一级目录名并写入缓冲区，所以是反着的路径
+	while( c_inode_no){
+		p_inode_no=get_parent_dir_inode_no(c_inode_no,io_buf);
+		if(get_child_dir_name(p_inode_no,c_inode_no,full_path_reverse,io_buf)==0){
+			c_inode_no=p_inode_no;
+		}else{//如果没找到父目录名
+			sys_free(io_buf);
+			return NULL;
+		}
+	}
+	ASSERT(strlen(full_path_reverse)<=size);
+	char* last_slash;
+	while( (last_slash =strrchr(full_path_reverse,'/')  ) ){
+		uint32_t len=strlen(buf);
+		strcpy(buf+len,last_slash);//每次把 full_path_reverse 中最后的/及以后的部分复制到buf末尾
+		*last_slash=0;//把full_path_reverse的结尾/及后面的去掉
+	}
+	sys_free(io_buf);
+	return buf;
+}
+int32_t sys_chdir(const char* path){
+	int32_t ret=-1;
+	struct path_search_record searched_record;
+	memset(&searched_record,0,sizeof(searched_record));
+	int32_t inode_no=search_file(path,&searched_record);
+	if(inode_no!=-1){
+		if(searched_record.file_type==FT_DIRECTORY){
+			running_thread()->cwd_inode_no=inode_no;
+			ret=0;
+		}else{
+			printfk("[fs.c]sys_chdir:%s is not directory\n",path);
+			ret=-1;
+		}
+	}
+	dir_close(searched_record.parent_dir);
+	return ret;
 }

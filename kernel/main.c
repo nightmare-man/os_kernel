@@ -72,23 +72,12 @@ int main(){
 	//printfk(" create %s!\n",sys_mkdir("/dir2/dir3/dir4")==0?"done":"fail");
 	
 	
-	struct dir* dir=sys_opendir("/");
-	struct dir_entry* dir_e=NULL;
-	//sys_rmdir("/dir4");
-	if(dir){
-		while(dir_e=sys_readdir(dir)){
-			printfk("type:%s,name:%s\n",dir_e->file_type==FT_DIRECTORY?"directory":"file",dir_e->file_name);
-		}
-	}
-
-	sys_rmdir("/dir5");
-	printfk("once again\n");
-	sys_rewinddir(dir);
-	if(dir){
-		while(dir_e=sys_readdir(dir)){
-			printfk("type:%s,name:%s\n",dir_e->file_type==FT_DIRECTORY?"directory":"file",dir_e->file_name);
-		}
-	}
+	char cwd_buf[32]={0};
+	sys_getcwd(cwd_buf,32);
+	printfk("cur work dir is %s\n",cwd_buf);
+	sys_chdir("/dir2/dir3");
+	sys_getcwd(cwd_buf,32);
+	printfk("cur work dir is %s\n",cwd_buf);
 	while(1);
 	
 	//thread_yeild();
